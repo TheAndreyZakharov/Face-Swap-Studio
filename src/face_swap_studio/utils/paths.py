@@ -18,48 +18,74 @@ def load_settings() -> dict[str, Any]:
     with CONFIG_PATH.open("r", encoding="utf-8") as file:
         settings = yaml.safe_load(file) or {}
 
+    if not isinstance(settings, dict):
+        raise ValueError("Корневой элемент settings.yaml должен быть объектом.")
+
     return settings
 
 
-def project_path(relative_path: str | Path) -> Path:
-    path = Path(relative_path)
+def project_path(path: str | Path) -> Path:
+    resolved = Path(path).expanduser()
 
-    if path.is_absolute():
-        return path
+    if resolved.is_absolute():
+        return resolved
 
-    return PROJECT_ROOT / path
+    return PROJECT_ROOT / resolved
 
 
-def ensure_directories() -> None:
-    settings = load_settings()
+def configured_path(key: str) -> Path:
+    paths = load_settings().get("paths", {})
 
-    for configured_path in settings.get("paths", {}).values():
-        project_path(configured_path).mkdir(parents=True, exist_ok=True)
+    if key not in paths:
+        raise KeyError(f"В settings.yaml отсутствует paths.{key}")
+
+    return project_path(paths[key])
 
 
 def input_directory() -> Path:
-    return project_path(load_settings()["paths"]["input"])
+    return configured_path("input")
 
 
 def output_directory() -> Path:
-    return project_path(load_settings()["paths"]["output"])
+    return configured_path("output")
 
 
 def temp_directory() -> Path:
-    return project_path(load_settings()["paths"]["temp"])
+    return configured_path("temp")
 
 
 def detector_directory() -> Path:
-    return project_path(load_settings()["paths"]["detectors"])
+    return configured_path("detectors")
 
 
 def swapper_directory() -> Path:
-    return project_path(load_settings()["paths"]["swappers"])
+    return configured_path("swappers")
 
 
 def enhancer_directory() -> Path:
-    return project_path(load_settings()["paths"]["enhancers"])
+    return configured_path("enhancers")
 
 
 def upscaler_directory() -> Path:
-    return project_path(load_settings()["paths"]["upscalers"])
+    return configured_path("upscalers")
+
+
+def vendor_directory() -> Path:
+    return PROJECT_ROOT / "vendor"
+
+
+def environments_directory() -> Path:
+    return PROJECT_ROOT / ".environments"
+
+
+def ensure_directories() -> None:
+    for directory in (
+        input_directory(),
+        output_directory(),
+        temp_directory(),
+        detector_directory(),
+        swapper_directory(),
+        enhancer_directory(),
+        upscaler_directory(),
+    ):
+        directory.mkdir(parents=True, exist_ok=True)

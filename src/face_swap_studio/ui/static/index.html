@@ -1,0 +1,764 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1"
+    >
+
+    <meta
+        name="theme-color"
+        content="#0a0b0e"
+    >
+
+    <title>Face Swap Studio</title>
+
+    <link
+        rel="icon"
+        type="image/png"
+        href="/static/assets/logo.png"
+    >
+
+    <link
+        rel="apple-touch-icon"
+        href="/static/assets/logo.png"
+    >
+
+    <link
+        rel="stylesheet"
+        href="/static/styles.css"
+    >
+</head>
+
+<body>
+    <div
+        id="application"
+        class="application"
+    >
+        <header class="topbar">
+            <div class="brand">
+                <img
+                    class="brand-logo"
+                    src="/static/assets/logo.png"
+                    alt="Face Swap Studio"
+                >
+
+                <div class="brand-copy">
+                    <h1>Face Swap Studio</h1>
+
+                    <p>
+                        Local face replacement workspace
+                    </p>
+                </div>
+            </div>
+
+            <div class="topbar-actions">
+                <div
+                    id="connection-status"
+                    class="connection-status"
+                >
+                    Connecting
+                </div>
+
+                <button
+                    id="reset-session-button"
+                    class="button button-ghost"
+                    type="button"
+                >
+                    Clear session
+                </button>
+            </div>
+        </header>
+
+        <main class="workspace">
+            <aside class="workflow-sidebar">
+                <div class="sidebar-heading">
+                    <span class="eyebrow">
+                        Workflow
+                    </span>
+
+                    <h2>
+                        Build a replacement
+                    </h2>
+
+                    <p>
+                        Add images, detect faces, define mappings
+                        and generate the result.
+                    </p>
+                </div>
+
+                <nav class="workflow-navigation">
+                    <button
+                        class="workflow-step is-active"
+                        data-scroll-target="upload-section"
+                        type="button"
+                    >
+                        <span class="workflow-step-number">
+                            01
+                        </span>
+
+                        <span>
+                            <strong>Add images</strong>
+                            <small>Source and target files</small>
+                        </span>
+                    </button>
+
+                    <button
+                        class="workflow-step"
+                        data-scroll-target="faces-section"
+                        type="button"
+                    >
+                        <span class="workflow-step-number">
+                            02
+                        </span>
+
+                        <span>
+                            <strong>Detect faces</strong>
+                            <small>Review detected identities</small>
+                        </span>
+                    </button>
+
+                    <button
+                        class="workflow-step"
+                        data-scroll-target="mapping-section"
+                        type="button"
+                    >
+                        <span class="workflow-step-number">
+                            03
+                        </span>
+
+                        <span>
+                            <strong>Map replacements</strong>
+                            <small>Choose what changes</small>
+                        </span>
+                    </button>
+
+                    <button
+                        class="workflow-step"
+                        data-scroll-target="generation-section"
+                        type="button"
+                    >
+                        <span class="workflow-step-number">
+                            04
+                        </span>
+
+                        <span>
+                            <strong>Generate</strong>
+                            <small>Model and final output</small>
+                        </span>
+                    </button>
+                </nav>
+
+                <div class="sidebar-status">
+                    <span class="sidebar-status-label">
+                        Status
+                    </span>
+
+                    <p id="status-message">
+                        Preparing application.
+                    </p>
+                </div>
+            </aside>
+
+            <div class="content-column">
+                <section
+                    id="upload-section"
+                    class="panel"
+                >
+                    <div class="section-heading">
+                        <div>
+                            <span class="eyebrow">
+                                01 · Images
+                            </span>
+
+                            <h2>
+                                Add source and target images
+                            </h2>
+
+                            <p>
+                                Add identities and target photographs
+                                independently. New files can be added
+                                at any time.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="upload-grid">
+                        <article class="upload-card">
+                            <div class="upload-card-heading">
+                                <div>
+                                    <h3>
+                                        Source identities
+                                    </h3>
+
+                                    <p>
+                                        Faces that may be inserted into
+                                        the target image.
+                                    </p>
+                                </div>
+
+                                <span
+                                    id="source-count"
+                                    class="count-badge"
+                                >
+                                    0
+                                </span>
+                            </div>
+
+                            <label
+                                id="source-dropzone"
+                                class="dropzone"
+                                for="source-input"
+                            >
+                                <input
+                                    id="source-input"
+                                    type="file"
+                                    accept="image/*"
+                                    multiple
+                                    hidden
+                                >
+
+                                <span class="dropzone-symbol">
+                                    +
+                                </span>
+
+                                <strong>
+                                    Add source images
+                                </strong>
+
+                                <span>
+                                    Click or drag files here
+                                </span>
+                            </label>
+
+                            <div
+                                id="source-image-list"
+                                class="image-strip"
+                            >
+                                <div class="empty-inline">
+                                    No source images
+                                </div>
+                            </div>
+                        </article>
+
+                        <article class="upload-card">
+                            <div class="upload-card-heading">
+                                <div>
+                                    <h3>
+                                        Target images
+                                    </h3>
+
+                                    <p>
+                                        Select the image whose faces
+                                        should be replaced.
+                                    </p>
+                                </div>
+
+                                <span
+                                    id="target-count"
+                                    class="count-badge"
+                                >
+                                    0
+                                </span>
+                            </div>
+
+                            <label
+                                id="target-dropzone"
+                                class="dropzone"
+                                for="target-input"
+                            >
+                                <input
+                                    id="target-input"
+                                    type="file"
+                                    accept="image/*"
+                                    multiple
+                                    hidden
+                                >
+
+                                <span class="dropzone-symbol">
+                                    +
+                                </span>
+
+                                <strong>
+                                    Add target images
+                                </strong>
+
+                                <span>
+                                    Click or drag files here
+                                </span>
+                            </label>
+
+                            <div
+                                id="target-image-list"
+                                class="image-strip"
+                            >
+                                <div class="empty-inline">
+                                    No target images
+                                </div>
+                            </div>
+                        </article>
+                    </div>
+
+                    <div class="detection-toolbar">
+                        <label class="range-field">
+                            <span>
+                                Detection confidence
+                            </span>
+
+                            <div class="range-row">
+                                <input
+                                    id="confidence-input"
+                                    type="range"
+                                    min="0.1"
+                                    max="0.95"
+                                    value="0.5"
+                                    step="0.05"
+                                >
+
+                                <output
+                                    id="confidence-output"
+                                    for="confidence-input"
+                                >
+                                    0.50
+                                </output>
+                            </div>
+                        </label>
+
+                        <button
+                            id="detect-button"
+                            class="button button-primary"
+                            type="button"
+                        >
+                            Detect faces
+                        </button>
+                    </div>
+                </section>
+
+                <section
+                    id="faces-section"
+                    class="panel"
+                >
+                    <div class="section-heading">
+                        <div>
+                            <span class="eyebrow">
+                                02 · Detection
+                            </span>
+
+                            <h2>
+                                Detected faces
+                            </h2>
+
+                            <p>
+                                Open a thumbnail for a larger preview.
+                                Detection is performed for the selected
+                                target image.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="face-columns">
+                        <article class="face-column">
+                            <div class="face-column-heading">
+                                <h3>
+                                    Source identities
+                                </h3>
+
+                                <span
+                                    id="source-face-count"
+                                    class="count-badge"
+                                >
+                                    0
+                                </span>
+                            </div>
+
+                            <div
+                                id="source-face-grid"
+                                class="face-grid"
+                            >
+                                <div class="empty-state">
+                                    <strong>
+                                        No source faces
+                                    </strong>
+
+                                    <span>
+                                        Add images and run detection.
+                                    </span>
+                                </div>
+                            </div>
+                        </article>
+
+                        <article class="face-column">
+                            <div class="face-column-heading">
+                                <h3>
+                                    Target faces
+                                </h3>
+
+                                <span
+                                    id="target-face-count"
+                                    class="count-badge"
+                                >
+                                    0
+                                </span>
+                            </div>
+
+                            <div
+                                id="target-face-grid"
+                                class="face-grid"
+                            >
+                                <div class="empty-state">
+                                    <strong>
+                                        No target faces
+                                    </strong>
+
+                                    <span>
+                                        Select a target image and run
+                                        detection.
+                                    </span>
+                                </div>
+                            </div>
+                        </article>
+                    </div>
+                </section>
+
+                <section
+                    id="mapping-section"
+                    class="panel"
+                >
+                    <div class="section-heading">
+                        <div>
+                            <span class="eyebrow">
+                                03 · Mapping
+                            </span>
+
+                            <h2>
+                                Define replacements
+                            </h2>
+
+                            <p>
+                                Choose a source identity for every
+                                detected target face, or leave the face
+                                unchanged.
+                            </p>
+                        </div>
+
+                        <button
+                            id="clear-mappings-button"
+                            class="button button-ghost button-small"
+                            type="button"
+                        >
+                            Clear mappings
+                        </button>
+                    </div>
+
+                    <div
+                        id="mapping-list"
+                        class="mapping-list"
+                    >
+                        <div class="empty-state empty-state-wide">
+                            <strong>
+                                No mappings available
+                            </strong>
+
+                            <span>
+                                Detect faces to configure replacements.
+                            </span>
+                        </div>
+                    </div>
+                </section>
+
+                <section
+                    id="generation-section"
+                    class="generation-layout"
+                >
+                    <div class="panel settings-panel">
+                        <div class="section-heading">
+                            <div>
+                                <span class="eyebrow">
+                                    04 · Settings
+                                </span>
+
+                                <h2>
+                                    Model and processing
+                                </h2>
+                            </div>
+                        </div>
+
+                        <label class="field">
+                            <span class="field-label">
+                                Face-swap model
+                            </span>
+
+                            <select id="model-select">
+                                <option value="">
+                                    Loading models
+                                </option>
+                            </select>
+                        </label>
+
+                        <div
+                            id="model-description"
+                            class="model-description"
+                        >
+                            Select an available model.
+                        </div>
+
+                        <div
+                            id="model-list"
+                            class="model-list"
+                        ></div>
+
+                        <details class="advanced-settings">
+                            <summary>
+                                Post-processing
+                            </summary>
+
+                            <div class="advanced-content">
+                                <label class="switch-field">
+                                    <input
+                                        id="enhance-input"
+                                        type="checkbox"
+                                    >
+
+                                    <span class="switch"></span>
+
+                                    <span>
+                                        <strong>
+                                            Face restoration
+                                        </strong>
+
+                                        <small>
+                                            Apply GFPGAN to generated
+                                            faces.
+                                        </small>
+                                    </span>
+                                </label>
+
+                                <label class="range-field">
+                                    <span>
+                                        Restoration strength
+                                    </span>
+
+                                    <div class="range-row">
+                                        <input
+                                            id="enhancement-weight-input"
+                                            type="range"
+                                            min="0"
+                                            max="1"
+                                            value="0.35"
+                                            step="0.05"
+                                        >
+
+                                        <output
+                                            id="enhancement-weight-output"
+                                            for="enhancement-weight-input"
+                                        >
+                                            0.35
+                                        </output>
+                                    </div>
+                                </label>
+
+                                <label class="switch-field">
+                                    <input
+                                        id="upscale-input"
+                                        type="checkbox"
+                                    >
+
+                                    <span class="switch"></span>
+
+                                    <span>
+                                        <strong>
+                                            Image upscaling
+                                        </strong>
+
+                                        <small>
+                                            Apply Real-ESRGAN to the
+                                            complete image.
+                                        </small>
+                                    </span>
+                                </label>
+
+                                <div class="two-column-fields">
+                                    <label class="field">
+                                        <span class="field-label">
+                                            Upscale factor
+                                        </span>
+
+                                        <select id="upscale-factor-select">
+                                            <option value="1.5">
+                                                1.5×
+                                            </option>
+
+                                            <option
+                                                value="2"
+                                                selected
+                                            >
+                                                2×
+                                            </option>
+
+                                            <option value="3">
+                                                3×
+                                            </option>
+
+                                            <option value="4">
+                                                4×
+                                            </option>
+                                        </select>
+                                    </label>
+
+                                    <label class="field">
+                                        <span class="field-label">
+                                            Tile size
+                                        </span>
+
+                                        <select id="tile-size-select">
+                                            <option value="128">
+                                                128 px
+                                            </option>
+
+                                            <option value="192">
+                                                192 px
+                                            </option>
+
+                                            <option
+                                                value="256"
+                                                selected
+                                            >
+                                                256 px
+                                            </option>
+
+                                            <option value="384">
+                                                384 px
+                                            </option>
+
+                                            <option value="512">
+                                                512 px
+                                            </option>
+                                        </select>
+                                    </label>
+                                </div>
+                            </div>
+                        </details>
+
+                        <button
+                            id="generate-button"
+                            class="button button-primary generate-button"
+                            type="button"
+                        >
+                            Generate image
+                        </button>
+                    </div>
+
+                    <div class="panel result-panel">
+                        <div class="section-heading">
+                            <div>
+                                <span class="eyebrow">
+                                    Result
+                                </span>
+
+                                <h2>
+                                    Generated image
+                                </h2>
+                            </div>
+
+                            <a
+                                id="download-button"
+                                class="button button-ghost button-small is-hidden"
+                                href="#"
+                                download
+                            >
+                                Download
+                            </a>
+                        </div>
+
+                        <button
+                            id="result-preview"
+                            class="result-preview"
+                            type="button"
+                            disabled
+                        >
+                            <div
+                                id="result-placeholder"
+                                class="result-placeholder"
+                            >
+                                <span class="result-placeholder-symbol">
+                                    —
+                                </span>
+
+                                <strong>
+                                    No result yet
+                                </strong>
+
+                                <span>
+                                    Configure mappings and generate an
+                                    image.
+                                </span>
+                            </div>
+
+                            <img
+                                id="result-image"
+                                alt="Generated result"
+                                hidden
+                            >
+                        </button>
+                    </div>
+                </section>
+            </div>
+        </main>
+    </div>
+
+    <div
+        id="loading-overlay"
+        class="loading-overlay is-hidden"
+        aria-hidden="true"
+    >
+        <div class="loading-dialog">
+            <div class="loading-spinner"></div>
+
+            <strong id="loading-title">
+                Processing
+            </strong>
+
+            <span id="loading-message">
+                Please keep this window open.
+            </span>
+        </div>
+    </div>
+
+    <dialog
+        id="image-dialog"
+        class="image-dialog"
+    >
+        <button
+            id="dialog-close-button"
+            class="dialog-close-button"
+            type="button"
+            aria-label="Close preview"
+        >
+            ×
+        </button>
+
+        <img
+            id="dialog-image"
+            alt="Image preview"
+        >
+
+        <div
+            id="dialog-caption"
+            class="dialog-caption"
+        ></div>
+    </dialog>
+
+    <div
+        id="toast-region"
+        class="toast-region"
+        aria-live="polite"
+    ></div>
+
+    <script
+        src="/static/app.js"
+        defer
+    ></script>
+</body>
+</html>

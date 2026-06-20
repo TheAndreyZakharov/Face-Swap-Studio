@@ -1,15 +1,24 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
 
-from src.face_swap_studio.utils.paths import PROJECT_ROOT
+from src.face_swap_studio.utils.paths import (
+    PROJECT_ROOT,
+    enhancer_directory,
+    environments_directory,
+    swapper_directory,
+    upscaler_directory,
+    vendor_directory,
+)
 
 
 class ModelKind(StrEnum):
     FACE_SWAP = "face_swap"
     HEAD_SWAP = "head_swap"
+    FACE_ENHANCEMENT = "face_enhancement"
+    IMAGE_UPSCALING = "image_upscaling"
 
 
 class BackendKind(StrEnum):
@@ -19,222 +28,361 @@ class BackendKind(StrEnum):
 
 @dataclass(frozen=True, slots=True)
 class ModelDefinition:
-    key: str
-    label: str
+    id: str
+    name: str
     description: str
     kind: ModelKind
     backend: BackendKind
-    environment: Path | None
-    entrypoint: Path | None
-    required_paths: tuple[Path, ...] = field(default_factory=tuple)
-
-    def missing_paths(self) -> tuple[Path, ...]:
-        return tuple(path for path in self.required_paths if not path.exists())
-
-    @property
-    def installed(self) -> bool:
-        return not self.missing_paths()
+    required_paths: tuple[Path, ...]
+    environment_python: Path | None = None
+    runner_path: Path | None = None
+    supports_multiple_faces: bool = False
+    supports_face_assignments: bool = False
 
 
-def project_path(*parts: str) -> Path:
-    return PROJECT_ROOT.joinpath(*parts)
+def model_definitions() -> tuple[ModelDefinition, ...]:
+    vendor = vendor_directory()
+    environments = environments_directory()
+    scripts = PROJECT_ROOT / "scripts" / "external"
 
-
-SIMSWAP_ROOT = project_path("vendor", "simswap")
-GHOST_ROOT = project_path("vendor", "ghost")
-GHOST2_ROOT = project_path("vendor", "ghost2")
-
-
-MODELS: dict[str, ModelDefinition] = {
-    "inswapper_128": ModelDefinition(
-        key="inswapper_128",
-        label="InSwapper 128",
-        description="Быстрая ONNX-модель замены лица.",
-        kind=ModelKind.FACE_SWAP,
-        backend=BackendKind.INTERNAL,
-        environment=None,
-        entrypoint=None,
-        required_paths=(
-            project_path(
-                "models",
-                "swappers",
-                "inswapper_128.onnx",
+    return (
+        ModelDefinition(
+            id="inswapper_128",
+            name="InSwapper 128",
+            description=(
+                "Быстрая локальная ONNX-модель. Поддерживает выбор "
+                "конкретного target-лица."
+            ),
+            kind=ModelKind.FACE_SWAP,
+            backend=BackendKind.INTERNAL,
+            required_paths=(
+                swapper_directory() / "inswapper_128.onnx",
+            ),
+            supports_multiple_faces=True,
+            supports_face_assignments=True,
+        ),
+        ModelDefinition(
+            id="simswap_512",
+            name="SimSwap 512 Beta",
+            description=(
+                "Высокодетализированная модель с рабочим разрешением "
+                "лица 512×512."
+            ),
+            kind=ModelKind.FACE_SWAP,
+            backend=BackendKind.EXTERNAL,
+            required_paths=(
+                vendor
+                / "simswap"
+                / "checkpoints"
+                / "512"
+                / "550000_net_G.pth",
+                vendor
+                / "simswap"
+                / "arcface_model"
+                / "arcface_checkpoint.tar",
+                vendor
+                / "simswap"
+                / "parsing_model"
+                / "checkpoint"
+                / "79999_iter.pth",
+                vendor
+                / "simswap"
+                / "insightface_func"
+                / "models"
+                / "antelope"
+                / "scrfd_10g_bnkps.onnx",
+                vendor
+                / "simswap"
+                / "insightface_func"
+                / "models"
+                / "antelope"
+                / "glintr100.onnx",
+            ),
+            environment_python=(
+                environments / "simswap" / "bin" / "python"
+            ),
+            runner_path=scripts / "simswap" / "infer.py",
+            supports_multiple_faces=True,
+            supports_face_assignments=False,
+        ),
+        ModelDefinition(
+            id="ghost_unet_1block",
+            name="GHOST U-Net 1 Block",
+            description=(
+                "Самый лёгкий вариант GHOST. Требует меньше памяти."
+            ),
+            kind=ModelKind.FACE_SWAP,
+            backend=BackendKind.EXTERNAL,
+            required_paths=(
+                vendor / "ghost" / "weights" / "G_unet_1block.pth",
+                vendor / "ghost" / "arcface_model" / "backbone.pth",
+                vendor
+                / "ghost"
+                / "insightface_func"
+                / "models"
+                / "antelope"
+                / "scrfd_10g_bnkps.onnx",
+                vendor
+                / "ghost"
+                / "insightface_func"
+                / "models"
+                / "antelope"
+                / "glintr100.onnx",
+            ),
+            environment_python=(
+                environments / "ghost" / "bin" / "python"
+            ),
+            runner_path=scripts / "ghost" / "infer.py",
+            supports_multiple_faces=True,
+            supports_face_assignments=False,
+        ),
+        ModelDefinition(
+            id="ghost_unet_2blocks",
+            name="GHOST U-Net 2 Blocks",
+            description=(
+                "Сбалансированный вариант GHOST по качеству и памяти."
+            ),
+            kind=ModelKind.FACE_SWAP,
+            backend=BackendKind.EXTERNAL,
+            required_paths=(
+                vendor / "ghost" / "weights" / "G_unet_2blocks.pth",
+                vendor / "ghost" / "arcface_model" / "backbone.pth",
+                vendor
+                / "ghost"
+                / "insightface_func"
+                / "models"
+                / "antelope"
+                / "scrfd_10g_bnkps.onnx",
+                vendor
+                / "ghost"
+                / "insightface_func"
+                / "models"
+                / "antelope"
+                / "glintr100.onnx",
+            ),
+            environment_python=(
+                environments / "ghost" / "bin" / "python"
+            ),
+            runner_path=scripts / "ghost" / "infer.py",
+            supports_multiple_faces=True,
+            supports_face_assignments=False,
+        ),
+        ModelDefinition(
+            id="ghost_unet_3blocks",
+            name="GHOST U-Net 3 Blocks",
+            description=(
+                "Самый тяжёлый из установленных вариантов GHOST."
+            ),
+            kind=ModelKind.FACE_SWAP,
+            backend=BackendKind.EXTERNAL,
+            required_paths=(
+                vendor / "ghost" / "weights" / "G_unet_3blocks.pth",
+                vendor / "ghost" / "arcface_model" / "backbone.pth",
+                vendor
+                / "ghost"
+                / "insightface_func"
+                / "models"
+                / "antelope"
+                / "scrfd_10g_bnkps.onnx",
+                vendor
+                / "ghost"
+                / "insightface_func"
+                / "models"
+                / "antelope"
+                / "glintr100.onnx",
+            ),
+            environment_python=(
+                environments / "ghost" / "bin" / "python"
+            ),
+            runner_path=scripts / "ghost" / "infer.py",
+            supports_multiple_faces=True,
+            supports_face_assignments=False,
+        ),
+        ModelDefinition(
+            id="ghost2_head",
+            name="GHOST 2.0 Head Swap",
+            description=(
+                "Полная замена головы. Самая тяжёлая модель в проекте."
+            ),
+            kind=ModelKind.HEAD_SWAP,
+            backend=BackendKind.EXTERNAL,
+            required_paths=(
+                vendor
+                / "ghost2"
+                / "aligner_checkpoints"
+                / "aligner_1020_gaze_final.ckpt",
+                vendor
+                / "ghost2"
+                / "blender_checkpoints"
+                / "blender_lama.ckpt",
+                vendor
+                / "ghost2"
+                / "weights"
+                / "backbone50_1.pth",
+                vendor
+                / "ghost2"
+                / "weights"
+                / "vgg19-d01eb7cb.pth",
+                vendor
+                / "ghost2"
+                / "weights"
+                / "segformer_B5_ce.onnx",
+                vendor
+                / "ghost2"
+                / "repos"
+                / "stylematte"
+                / "stylematte"
+                / "checkpoints"
+                / "stylematte_synth.pth",
+                vendor
+                / "ghost2"
+                / "repos"
+                / "deca"
+                / "data"
+                / "generic_model.pkl",
+            ),
+            environment_python=(
+                environments / "ghost2" / "bin" / "python"
+            ),
+            runner_path=scripts / "ghost2" / "infer.py",
+            supports_multiple_faces=False,
+            supports_face_assignments=False,
+        ),
+        ModelDefinition(
+            id="gfpgan_v1_4",
+            name="GFPGAN v1.4",
+            description="Восстановление и улучшение областей лица.",
+            kind=ModelKind.FACE_ENHANCEMENT,
+            backend=BackendKind.INTERNAL,
+            required_paths=(
+                enhancer_directory() / "GFPGANv1.4.pth",
             ),
         ),
-    ),
-    "simswap_512": ModelDefinition(
-        key="simswap_512",
-        label="SimSwap 512 Beta",
-        description=("Высокодетализированная замена лица с маской BiSeNet."),
-        kind=ModelKind.FACE_SWAP,
-        backend=BackendKind.EXTERNAL,
-        environment=project_path(
-            ".environments",
-            "simswap",
-        ),
-        entrypoint=project_path(
-            "scripts",
-            "external",
-            "simswap",
-            "infer.py",
-        ),
-        required_paths=(
-            project_path(
-                ".environments",
-                "simswap",
-                "bin",
-                "python",
+        ModelDefinition(
+            id="realesrgan_x4plus",
+            name="Real-ESRGAN x4plus",
+            description="Улучшение и увеличение всего изображения.",
+            kind=ModelKind.IMAGE_UPSCALING,
+            backend=BackendKind.INTERNAL,
+            required_paths=(
+                upscaler_directory() / "RealESRGAN_x4plus.pth",
             ),
-            SIMSWAP_ROOT / "checkpoints" / "512" / "550000_net_G.pth",
-            SIMSWAP_ROOT / "arcface_model" / "arcface_checkpoint.tar",
-            SIMSWAP_ROOT / "parsing_model" / "checkpoint" / "79999_iter.pth",
-            SIMSWAP_ROOT / "insightface_func" / "models" / "antelope" / "scrfd_10g_bnkps.onnx",
-            SIMSWAP_ROOT / "insightface_func" / "models" / "antelope" / "glintr100.onnx",
         ),
-    ),
-    "ghost_unet_1block": ModelDefinition(
-        key="ghost_unet_1block",
-        label="GHOST U-Net 1 Block",
-        description=("Более лёгкая конфигурация GHOST."),
-        kind=ModelKind.FACE_SWAP,
-        backend=BackendKind.EXTERNAL,
-        environment=project_path(
-            ".environments",
-            "ghost",
-        ),
-        entrypoint=project_path(
-            "scripts",
-            "external",
-            "ghost",
-            "infer.py",
-        ),
-        required_paths=(
-            project_path(
-                ".environments",
-                "ghost",
-                "bin",
-                "python",
-            ),
-            GHOST_ROOT / "weights" / "G_unet_1block.pth",
-            GHOST_ROOT / "arcface_model" / "backbone.pth",
-            GHOST_ROOT / "coordinate_reg" / "model" / "2d106det",
-            GHOST_ROOT / "insightface_func" / "models" / "antelope" / "scrfd_10g_bnkps.onnx",
-            GHOST_ROOT / "insightface_func" / "models" / "antelope" / "glintr100.onnx",
-        ),
-    ),
-    "ghost_unet_2blocks": ModelDefinition(
-        key="ghost_unet_2blocks",
-        label="GHOST U-Net 2 Blocks",
-        description=("Основная рекомендованная конфигурация GHOST."),
-        kind=ModelKind.FACE_SWAP,
-        backend=BackendKind.EXTERNAL,
-        environment=project_path(
-            ".environments",
-            "ghost",
-        ),
-        entrypoint=project_path(
-            "scripts",
-            "external",
-            "ghost",
-            "infer.py",
-        ),
-        required_paths=(
-            project_path(
-                ".environments",
-                "ghost",
-                "bin",
-                "python",
-            ),
-            GHOST_ROOT / "weights" / "G_unet_2blocks.pth",
-            GHOST_ROOT / "arcface_model" / "backbone.pth",
-            GHOST_ROOT / "coordinate_reg" / "model" / "2d106det",
-            GHOST_ROOT / "insightface_func" / "models" / "antelope" / "scrfd_10g_bnkps.onnx",
-            GHOST_ROOT / "insightface_func" / "models" / "antelope" / "glintr100.onnx",
-        ),
-    ),
-    "ghost_unet_3blocks": ModelDefinition(
-        key="ghost_unet_3blocks",
-        label="GHOST U-Net 3 Blocks",
-        description=("Самая тяжёлая доступная конфигурация GHOST."),
-        kind=ModelKind.FACE_SWAP,
-        backend=BackendKind.EXTERNAL,
-        environment=project_path(
-            ".environments",
-            "ghost",
-        ),
-        entrypoint=project_path(
-            "scripts",
-            "external",
-            "ghost",
-            "infer.py",
-        ),
-        required_paths=(
-            project_path(
-                ".environments",
-                "ghost",
-                "bin",
-                "python",
-            ),
-            GHOST_ROOT / "weights" / "G_unet_3blocks.pth",
-            GHOST_ROOT / "arcface_model" / "backbone.pth",
-            GHOST_ROOT / "coordinate_reg" / "model" / "2d106det",
-            GHOST_ROOT / "insightface_func" / "models" / "antelope" / "scrfd_10g_bnkps.onnx",
-            GHOST_ROOT / "insightface_func" / "models" / "antelope" / "glintr100.onnx",
-        ),
-    ),
-    "ghost2_head": ModelDefinition(
-        key="ghost2_head",
-        label="GHOST 2.0 Head Swap",
-        description=("Полная замена головы через Aligner и Blender."),
-        kind=ModelKind.HEAD_SWAP,
-        backend=BackendKind.EXTERNAL,
-        environment=project_path(
-            ".environments",
-            "ghost2",
-        ),
-        entrypoint=project_path(
-            "scripts",
-            "external",
-            "ghost2",
-            "infer.py",
-        ),
-        required_paths=(
-            project_path(
-                ".environments",
-                "ghost2",
-                "bin",
-                "python",
-            ),
-            GHOST2_ROOT / "aligner_checkpoints" / "aligner_1020_gaze_final.ckpt",
-            GHOST2_ROOT / "blender_checkpoints" / "blender_lama.ckpt",
-            GHOST2_ROOT / "weights" / "backbone50_1.pth",
-            GHOST2_ROOT / "weights" / "vgg19-d01eb7cb.pth",
-            GHOST2_ROOT / "weights" / "segformer_B5_ce.onnx",
-            GHOST2_ROOT / "src" / "losses" / "gaze_models" / "vgg_16_2_forward_sum.pt",
-            GHOST2_ROOT / "src" / "losses" / "gaze_models" / "resnet_18_2_forward_sum.pt",
-            GHOST2_ROOT
-            / "repos"
-            / "stylematte"
-            / "stylematte"
-            / "checkpoints"
-            / "stylematte_synth.pth",
-            GHOST2_ROOT / "repos" / "deca" / "data" / "generic_model.pkl",
-            GHOST2_ROOT / "repos" / "BlazeFace_PyTorch" / "blazeface.pth",
-        ),
-    ),
+    )
+
+
+MODEL_MAP: dict[str, ModelDefinition] = {
+    definition.id: definition
+    for definition in model_definitions()
 }
 
 
-def available_models() -> list[ModelDefinition]:
-    return list(MODELS.values())
-
-
-def installed_models() -> list[ModelDefinition]:
-    return [model for model in MODELS.values() if model.installed]
-
-
-def get_model(model_key: str) -> ModelDefinition:
+def model_by_id(
+    model_id: str,
+) -> ModelDefinition:
     try:
-        return MODELS[model_key]
+        return MODEL_MAP[model_id]
     except KeyError as error:
-        raise ValueError(f"Неизвестная модель: {model_key}") from error
+        raise ValueError(
+            f"Неизвестная модель: {model_id}"
+        ) from error
+
+
+def selectable_swap_models() -> tuple[ModelDefinition, ...]:
+    return tuple(
+        definition
+        for definition in model_definitions()
+        if definition.kind
+        in {
+            ModelKind.FACE_SWAP,
+            ModelKind.HEAD_SWAP,
+        }
+    )
+
+
+def enhancement_models() -> tuple[ModelDefinition, ...]:
+    return tuple(
+        definition
+        for definition in model_definitions()
+        if definition.kind
+        in {
+            ModelKind.FACE_ENHANCEMENT,
+            ModelKind.IMAGE_UPSCALING,
+        }
+    )
+
+
+def _valid_file(
+    path: Path,
+) -> bool:
+    resolved = path.expanduser().resolve()
+
+    return (
+        resolved.is_file()
+        and resolved.stat().st_size > 0
+    )
+
+
+def _valid_directory(
+    path: Path,
+) -> bool:
+    return path.expanduser().resolve().is_dir()
+
+
+def is_model_ready(
+    definition: ModelDefinition,
+) -> bool:
+    for required_path in definition.required_paths:
+        resolved = required_path.expanduser().resolve()
+
+        if resolved.is_dir():
+            if not _valid_directory(resolved):
+                return False
+        elif not _valid_file(resolved):
+            return False
+
+    if definition.backend == BackendKind.EXTERNAL:
+        if definition.environment_python is None:
+            return False
+
+        if not _valid_file(definition.environment_python):
+            return False
+
+        if definition.runner_path is None:
+            return False
+
+        if not _valid_file(definition.runner_path):
+            return False
+
+    return True
+
+
+def missing_model_paths(
+    definition: ModelDefinition,
+) -> tuple[Path, ...]:
+    missing: list[Path] = []
+
+    for path in definition.required_paths:
+        resolved = path.expanduser().resolve()
+
+        if not resolved.exists():
+            missing.append(resolved)
+        elif resolved.is_file() and resolved.stat().st_size == 0:
+            missing.append(resolved)
+
+    if definition.backend == BackendKind.EXTERNAL:
+        if definition.environment_python is None:
+            pass
+        elif not _valid_file(definition.environment_python):
+            missing.append(
+                definition.environment_python.expanduser().resolve()
+            )
+
+        if definition.runner_path is None:
+            pass
+        elif not _valid_file(definition.runner_path):
+            missing.append(
+                definition.runner_path.expanduser().resolve()
+            )
+
+    return tuple(missing)

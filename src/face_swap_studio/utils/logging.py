@@ -13,9 +13,14 @@ def configure_logging(level: int = logging.INFO) -> None:
         force=True,
     )
 
-    logging.getLogger("PIL").setLevel(logging.WARNING)
-    logging.getLogger("urllib3").setLevel(logging.WARNING)
-    logging.getLogger("httpx").setLevel(logging.WARNING)
+    for logger_name in (
+        "PIL",
+        "urllib3",
+        "httpx",
+        "multipart",
+        "matplotlib",
+    ):
+        logging.getLogger(logger_name).setLevel(logging.WARNING)
 
 
 def get_logger(name: str) -> logging.Logger:

@@ -1,21 +1,11 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Any
-
 import cv2
 import numpy as np
 
+from src.face_swap_studio.domain.entities import DetectedFace
 from src.face_swap_studio.models.model_manager import get_face_analyser
-
-
-@dataclass(slots=True)
-class DetectedFace:
-    index: int
-    face: Any
-    bbox: tuple[int, int, int, int]
-    confidence: float
-    area: int
+from src.face_swap_studio.utils.paths import load_settings
 
 
 def _clamp_bbox(
@@ -35,10 +25,30 @@ def _clamp_bbox(
 
 def detect_faces(
     image_bgr: np.ndarray,
-    confidence_threshold: float = 0.5,
+    confidence_threshold: float | None = None,
 ) -> list[DetectedFace]:
     if image_bgr is None or image_bgr.size == 0:
         raise ValueError("Передано пустое изображение.")
+
+    detection_settings = load_settings().get("detection", {})
+
+    threshold = (
+        float(confidence_threshold)
+        if confidence_threshold is not None
+        else float(
+            detection_settings.get(
+                "confidence_threshold",
+                0.5,
+            )
+        )
+    )
+
+    maximum_faces = int(
+        detection_settings.get(
+            "maximum_faces",
+            100,
+        )
+    )
 
     analyser = get_face_analyser()
     raw_faces = analyser.get(image_bgr)
@@ -47,47 +57,56 @@ def detect_faces(
     detected: list[DetectedFace] = []
 
     for raw_face in raw_faces:
-        confidence = float(getattr(raw_face, "det_score", 0.0))
+        confidence = float(
+            getattr(
+                raw_face,
+                "det_score",
+                0.0,
+            )
+        )
 
-        if confidence < confidence_threshold:
+        if confidence < threshold:
             continue
 
-        bbox = _clamp_bbox(raw_face.bbox, width, height)
+        bbox = _clamp_bbox(
+            raw_face.bbox,
+            width,
+            height,
+        )
         x1, y1, x2, y2 = bbox
-        area = (x2 - x1) * (y2 - y1)
 
         detected.append(
             DetectedFace(
                 index=0,
-                face=raw_face,
+                raw_face=raw_face,
                 bbox=bbox,
                 confidence=confidence,
-                area=area,
+                area=(x2 - x1) * (y2 - y1),
             )
         )
 
-    detected.sort(key=lambda item: (item.bbox[0], item.bbox[1]))
+    detected.sort(
+        key=lambda item: (
+            item.bbox[0],
+            item.bbox[1],
+        )
+    )
 
-    for index, item in enumerate(detected):
-        item.index = index
+    detected = detected[:maximum_faces]
+
+    for index, face in enumerate(detected):
+        face.index = index
 
     return detected
 
 
-def largest_face(faces: list[DetectedFace]) -> DetectedFace:
-    if not faces:
-        raise ValueError("На изображении не найдено ни одного лица.")
-
-    return max(faces, key=lambda item: item.area)
-
-
 def face_crop(
     image_bgr: np.ndarray,
-    detected_face: DetectedFace,
-    padding_ratio: float = 0.25,
+    face: DetectedFace,
+    padding_ratio: float = 0.28,
 ) -> np.ndarray:
     height, width = image_bgr.shape[:2]
-    x1, y1, x2, y2 = detected_face.bbox
+    x1, y1, x2, y2 = face.bbox
 
     face_width = x2 - x1
     face_height = y2 - y1
@@ -100,28 +119,37 @@ def face_crop(
     crop_x2 = min(width, x2 + padding_x)
     crop_y2 = min(height, y2 + padding_y)
 
-    return image_bgr[crop_y1:crop_y2, crop_x1:crop_x2].copy()
+    return image_bgr[
+        crop_y1:crop_y2,
+        crop_x1:crop_x2,
+    ].copy()
 
 
-def create_detection_preview(
+def detection_preview(
     image_bgr: np.ndarray,
     faces: list[DetectedFace],
 ) -> np.ndarray:
-    preview = image_bgr.copy()
+    result = image_bgr.copy()
 
-    for item in faces:
-        x1, y1, x2, y2 = item.bbox
+    for face in faces:
+        x1, y1, x2, y2 = face.bbox
 
-        cv2.rectangle(preview, (x1, y1), (x2, y2), (0, 220, 0), 2)
+        cv2.rectangle(
+            result,
+            (x1, y1),
+            (x2, y2),
+            (70, 220, 120),
+            3,
+        )
         cv2.putText(
-            preview,
-            f"Face {item.index}",
-            (x1, max(20, y1 - 8)),
+            result,
+            str(face.index + 1),
+            (x1 + 5, y1 + 28),
             cv2.FONT_HERSHEY_SIMPLEX,
-            0.65,
-            (0, 220, 0),
+            0.8,
+            (70, 220, 120),
             2,
             cv2.LINE_AA,
         )
 
-    return preview
+    return result

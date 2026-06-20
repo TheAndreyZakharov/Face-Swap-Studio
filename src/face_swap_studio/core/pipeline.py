@@ -1,185 +1,384 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+import atexit
+import shutil
+import threading
+import time
+import uuid
 from pathlib import Path
 
 import cv2
 import numpy as np
 
-from src.face_swap_studio.core.detector import (
-    DetectedFace,
-    detect_faces,
-    largest_face,
-)
 from src.face_swap_studio.core.enhancer import enhance_faces
-from src.face_swap_studio.core.swapper import swap_face
-from src.face_swap_studio.core.upscaler import resize_if_too_large, upscale_image
-from src.face_swap_studio.utils.logging import get_logger
+from src.face_swap_studio.core.upscaler import (
+    resize_if_too_large,
+    upscale_image,
+)
+from src.face_swap_studio.domain.entities import ProcessingOptions
+from src.face_swap_studio.utils.paths import (
+    load_settings,
+    output_directory,
+)
 
-logger = get_logger(__name__)
-
-
-@dataclass(slots=True)
-class SourceIdentity:
-    index: int
-    path: Path
-    image: np.ndarray
-    detected_face: DetectedFace
-
-
-@dataclass(slots=True)
-class TargetAnalysis:
-    index: int
-    path: Path
-    image: np.ndarray
-    faces: list[DetectedFace]
+_OUTPUT_CLEANUP_LOCK = threading.RLock()
+_OUTPUT_CLEANUP_REGISTERED = False
 
 
-@dataclass(slots=True)
-class FaceAssignment:
-    target_index: int
-    face_index: int
-    source_index: int | None
-    enabled: bool = True
+def cleanup_output_directory() -> None:
+    """
+    Полностью очищает data/output, сохраняя только .gitkeep.
+
+    Вызывается:
+    1. При запуске приложения — удаляет остатки после аварийного завершения.
+    2. При нормальном завершении Python-процесса.
+    3. При Ctrl+C, поскольку Python выполняет atexit-обработчики.
+    """
+    with _OUTPUT_CLEANUP_LOCK:
+        directory = output_directory().expanduser().resolve()
+
+        if not directory.exists():
+            directory.mkdir(
+                parents=True,
+                exist_ok=True,
+            )
+            return
+
+        if not directory.is_dir():
+            raise RuntimeError(
+                f"Путь output существует, но не является директорией: "
+                f"{directory}"
+            )
+
+        for child in directory.iterdir():
+            if child.name == ".gitkeep":
+                continue
+
+            try:
+                if child.is_symlink() or child.is_file():
+                    child.unlink(
+                        missing_ok=True,
+                    )
+                elif child.is_dir():
+                    shutil.rmtree(
+                        child,
+                        ignore_errors=False,
+                    )
+            except FileNotFoundError:
+                continue
+            except OSError as error:
+                print(
+                    f"[cleanup] Не удалось удалить {child}: {error}",
+                    flush=True,
+                )
 
 
-def read_image(path: str | Path) -> np.ndarray:
-    resolved = Path(path)
+def install_output_cleanup() -> None:
+    """
+    Один раз устанавливает автоматическую очистку output.
+    """
+    global _OUTPUT_CLEANUP_REGISTERED
+
+    with _OUTPUT_CLEANUP_LOCK:
+        if _OUTPUT_CLEANUP_REGISTERED:
+            return
+
+        _OUTPUT_CLEANUP_REGISTERED = True
+
+        # Сразу удаляем результаты, оставшиеся после предыдущего запуска.
+        cleanup_output_directory()
+
+        # Очищаем результаты при нормальном закрытии приложения и Ctrl+C.
+        atexit.register(
+            cleanup_output_directory
+        )
+
+
+install_output_cleanup()
+
+
+def read_image(
+    path: str | Path,
+) -> np.ndarray:
+    resolved = Path(
+        path
+    ).expanduser().resolve()
 
     if not resolved.is_file():
-        raise FileNotFoundError(f"Не найдено изображение: {resolved}")
+        raise FileNotFoundError(
+            f"Не найдено изображение: {resolved}"
+        )
 
-    data = np.fromfile(resolved, dtype=np.uint8)
-    image = cv2.imdecode(data, cv2.IMREAD_COLOR)
+    encoded_data = np.fromfile(
+        resolved,
+        dtype=np.uint8,
+    )
+
+    image = cv2.imdecode(
+        encoded_data,
+        cv2.IMREAD_COLOR,
+    )
 
     if image is None:
-        raise ValueError(f"Не удалось прочитать изображение: {resolved}")
+        raise ValueError(
+            f"Не удалось прочитать изображение: {resolved}"
+        )
 
     return image
 
 
-def write_image(path: str | Path, image_bgr: np.ndarray) -> Path:
-    destination = Path(path)
-    destination.parent.mkdir(parents=True, exist_ok=True)
+def write_image(
+    path: str | Path,
+    image_bgr: np.ndarray,
+) -> Path:
+    if (
+        image_bgr is None
+        or image_bgr.size == 0
+    ):
+        raise ValueError(
+            "Нельзя сохранить пустое изображение."
+        )
 
-    extension = destination.suffix.lower() or ".png"
-    success, encoded = cv2.imencode(extension, image_bgr)
+    destination = Path(
+        path
+    ).expanduser()
+
+    if not destination.suffix:
+        destination = destination.with_suffix(
+            ".png"
+        )
+
+    destination = destination.resolve()
+    destination.parent.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+    extension = destination.suffix.lower()
+
+    supported_extensions = {
+        ".png",
+        ".jpg",
+        ".jpeg",
+        ".webp",
+    }
+
+    if extension not in supported_extensions:
+        raise ValueError(
+            f"Неподдерживаемый формат изображения: {extension}"
+        )
+
+    encode_parameters: list[int] = []
+
+    if extension in {
+        ".jpg",
+        ".jpeg",
+    }:
+        settings = load_settings()
+
+        quality = int(
+            settings.get(
+                "processing",
+                {},
+            ).get(
+                "jpeg_quality",
+                95,
+            )
+        )
+
+        quality = max(
+            1,
+            min(
+                quality,
+                100,
+            ),
+        )
+
+        encode_parameters = [
+            cv2.IMWRITE_JPEG_QUALITY,
+            quality,
+        ]
+
+    success, encoded_image = cv2.imencode(
+        extension,
+        image_bgr,
+        encode_parameters,
+    )
 
     if not success:
-        raise RuntimeError(f"Не удалось закодировать изображение: {destination}")
+        raise RuntimeError(
+            f"Не удалось закодировать изображение: {destination}"
+        )
 
-    encoded.tofile(destination)
+    encoded_image.tofile(
+        destination
+    )
+
     return destination
 
 
-def analyse_sources(
-    source_paths: list[str | Path],
-    confidence_threshold: float = 0.5,
-) -> list[SourceIdentity]:
-    sources: list[SourceIdentity] = []
+def create_output_path(
+    target_path: Path,
+    model_id: str,
+) -> Path:
+    """
+    Создаёт временный результат внутри data/output.
 
-    for source_path in source_paths:
-        image = read_image(source_path)
-        faces = detect_faces(image, confidence_threshold)
+    Файл существует только во время работы приложения.
+    При закрытии приложения весь output автоматически очищается.
+    """
+    timestamp = time.strftime(
+        "%Y%m%d-%H%M%S"
+    )
+    unique_suffix = uuid.uuid4().hex[
+        :8
+    ]
 
-        if not faces:
-            logger.warning("В source-файле не найдено лицо: %s", source_path)
-            continue
+    run_directory = (
+        output_directory()
+        / f"run-{timestamp}-{unique_suffix}"
+    )
 
-        selected = largest_face(faces)
+    run_directory.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
 
-        sources.append(
-            SourceIdentity(
-                index=len(sources),
-                path=Path(source_path),
-                image=image,
-                detected_face=selected,
+    safe_model_id = "".join(
+        character
+        if (
+            character.isalnum()
+            or character in {
+                "-",
+                "_",
+            }
+        )
+        else "_"
+        for character in model_id
+    )
+
+    filename = (
+        f"{target_path.stem}_"
+        f"{safe_model_id}.png"
+    )
+
+    return run_directory / filename
+
+
+def apply_postprocessing(
+    result_path: Path,
+    options: ProcessingOptions,
+) -> Path:
+    if (
+        not options.enhance_faces
+        and not options.upscale_image
+    ):
+        return result_path
+
+    result_image = read_image(
+        result_path
+    )
+
+    if options.enhance_faces:
+        result_image = enhance_faces(
+            result_image,
+            weight=options.face_enhancement_weight,
+        )
+
+    if options.upscale_image:
+        result_image = upscale_image(
+            result_image,
+            output_scale=options.upscale_factor,
+            tile_size=options.tile_size,
+        )
+
+        settings = load_settings()
+
+        maximum_side = int(
+            settings.get(
+                "image_enhancement",
+                {},
+            ).get(
+                "maximum_output_side",
+                8000,
             )
         )
 
-    if not sources:
-        raise ValueError("Ни в одном исходном изображении не найдено лицо.")
-
-    return sources
-
-
-def analyse_targets(
-    target_paths: list[str | Path],
-    confidence_threshold: float = 0.5,
-) -> list[TargetAnalysis]:
-    targets: list[TargetAnalysis] = []
-
-    for index, target_path in enumerate(target_paths):
-        image = read_image(target_path)
-        faces = detect_faces(image, confidence_threshold)
-
-        targets.append(
-            TargetAnalysis(
-                index=index,
-                path=Path(target_path),
-                image=image,
-                faces=faces,
-            )
+        result_image = resize_if_too_large(
+            result_image,
+            maximum_side=maximum_side,
         )
 
-    return targets
+    return write_image(
+        result_path,
+        result_image,
+    )
 
 
-def process_target(
-    target: TargetAnalysis,
-    sources: list[SourceIdentity],
-    assignments: list[FaceAssignment],
-    swap_model: str = "InSwapper 128",
-    enhance_face_regions: bool = False,
-    face_enhancement_weight: float = 0.35,
-    upscale_full_image: bool = False,
-    upscale_factor: float = 2.0,
-    tile_size: int = 256,
-) -> np.ndarray:
-    result = target.image.copy()
+def process_single_pair(
+    source_path: str | Path,
+    target_path: str | Path,
+    options: ProcessingOptions,
+    target_face_index: int | None = None,
+) -> Path:
+    source = Path(
+        source_path
+    ).expanduser().resolve()
 
-    target_assignments = {
-        assignment.face_index: assignment
-        for assignment in assignments
-        if assignment.target_index == target.index and assignment.enabled
-    }
+    target = Path(
+        target_path
+    ).expanduser().resolve()
 
-    for target_face in target.faces:
-        assignment = target_assignments.get(target_face.index)
-
-        if assignment is None or assignment.source_index is None:
-            continue
-
-        if assignment.source_index < 0 or assignment.source_index >= len(sources):
-            logger.warning(
-                "Некорректный source index %s для target %s face %s",
-                assignment.source_index,
-                target.index,
-                target_face.index,
-            )
-            continue
-
-        source = sources[assignment.source_index]
-
-        result = swap_face(
-            image_bgr=result,
-            source_face=source.detected_face.face,
-            target_face=target_face.face,
-            model_label=swap_model,
+    if not source.is_file():
+        raise FileNotFoundError(
+            f"Не найден source-файл: {source}"
         )
 
-    if enhance_face_regions:
-        result = enhance_faces(
-            result,
-            weight=face_enhancement_weight,
+    if not target.is_file():
+        raise FileNotFoundError(
+            f"Не найден target-файл: {target}"
         )
 
-    if upscale_full_image:
-        result = upscale_image(
-            result,
-            output_scale=upscale_factor,
-            tile_size=tile_size,
-        )
-        result = resize_if_too_large(result)
+    output_path = create_output_path(
+        target_path=target,
+        model_id=options.model_id,
+    )
 
-    return result
+    # Эти импорты намеренно находятся внутри функции.
+    # Перенос наверх создаст циклический импорт:
+    # pipeline -> adapters -> inswapper -> pipeline.
+    from src.face_swap_studio.adapters.base import AdapterRequest
+    from src.face_swap_studio.adapters.registry import get_adapter
+
+    adapter = get_adapter(
+        options.model_id
+    )
+
+    if not adapter.is_available():
+        raise RuntimeError(
+            f"Модель не готова к работе: {options.model_id}"
+        )
+
+    request = AdapterRequest(
+        source_path=source,
+        target_path=target,
+        output_path=output_path,
+        target_face_index=target_face_index,
+    )
+
+    result_path = Path(
+        adapter.process(
+            request
+        )
+    ).expanduser().resolve()
+
+    if not result_path.is_file():
+        raise RuntimeError(
+            "Адаптер завершил работу, но не создал "
+            "результирующий файл."
+        )
+
+    return apply_postprocessing(
+        result_path=result_path,
+        options=options,
+    )

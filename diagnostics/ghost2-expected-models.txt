@@ -1,0 +1,20 @@
+vendor/ghost2/preprocess_image.py:52:    parsings_session = ort.InferenceSession('./weights/segformer_B5_ce.onnx', providers=providers)
+vendor/ghost2/train_aligner.py:169:                torch.load( './repos/stylematte/stylematte/checkpoints/stylematte_synth.pth',
+vendor/ghost2/train_aligner.py:347:    checkpoint_callback = PeriodicCheckpoint(cfg.train_options.ckpt_interval, dir='{}/aligner_checkpoints/{}/checkpoints'.format(cfg.home_dir, cfg.experiment_name))
+vendor/ghost2/inference.py:31:    ckpt = torch.load(args.ckpt_a, map_location='cpu')
+vendor/ghost2/inference.py:32:    aligner.load_state_dict(torch.load(args.ckpt_a), strict=False)
+vendor/ghost2/inference.py:37:    blender.load_state_dict(torch.load(args.ckpt_b, map_location='cpu')["state_dict"], strict=False,)
+vendor/ghost2/inference.py:53:            './repos/stylematte/stylematte/checkpoints/stylematte_synth.pth',
+vendor/ghost2/inference.py:63:    parsings_session = ort.InferenceSession('./weights/segformer_B5_ce.onnx', providers=providers)
+vendor/ghost2/inference.py:169:    parser.add_argument('--ckpt_a', default='./aligner_checkpoints/aligner_1020_gaze_final.ckpt', type=str, help='Aligner checkpoint')
+vendor/ghost2/inference.py:170:    parser.add_argument('--ckpt_b', default='./blender_checkpoints/blender_lama.ckpt', type=str, help='Blender checkpoint')
+vendor/ghost2/src/losses/gaze.py:32:        checkpoints_paths_dict = {'vgg16':f'{project_dir}/src/losses/gaze_models/vgg_16_2_forward_sum.pt', 'resnet18':f'{project_dir}/src/losses/gaze_models/resnet_18_2_forward_sum.pt'}
+vendor/ghost2/src/losses/gaze.py:34:            checkpoints_paths_dict = {'vgg16':f'{project_dir}/src/losses/gaze_models/vgg_16_2_forward_sum_inter.pt', 'resnet18':f'{project_dir}/src/losses/gaze_models/resnet_18_2_forward_sum_inter.pt'}  
+vendor/ghost2/src/losses/perceptual_vgg.py:24:            vgg_weights = torch.load(os.path.join(vgg_weights_dir, 'vgg19-d01eb7cb.pth'))
+vendor/ghost2/src/losses/perceptual_vgg.py:43:            # https://media.githubusercontent.com/media/yzhang559/vgg-face/master/VGG_FACE.caffemodel.pth
+vendor/ghost2/src/losses/perceptual_vgg.py:46:            model.load_state_dict(torch.load(os.path.join(vgg_weights_dir, 'vgg_face_weights.pth')))
+vendor/ghost2/src/utils/logging.py:18:            current = f"{self.dir}/epoch-{trainer.current_epoch}.ckpt"
+vendor/ghost2/src/utils/logging.py:21:        current = f"{self.dir}/last.ckpt"
+vendor/ghost2/src/utils/keypoint_detector.py:21:        cfg.model.flame_model_path = os.path.join(cfg.deca_dir, 'data', 'generic_model.pkl')
+vendor/ghost2/src/utils/keypoint_detector.py:36:        self.front_net.load_weights("./repos/BlazeFace_PyTorch/blazeface.pth")
+vendor/ghost2/src/aligner/embedder.py:21:        self.id_encoder.load_state_dict(torch.load('./weights/backbone50_1.pth', map_location='cpu'))

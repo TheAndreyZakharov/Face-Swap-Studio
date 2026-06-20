@@ -141,18 +141,19 @@ def download_once(
         response.raise_for_status()
 
         remaining_size = int(response.headers.get("content-length", 0))
-        total_size = (
-            initial_size + remaining_size if remaining_size > 0 else None
-        )
+        total_size = initial_size + remaining_size if remaining_size > 0 else None
 
-        with temporary.open(write_mode) as file, tqdm(
-            total=total_size,
-            initial=initial_size,
-            unit="B",
-            unit_scale=True,
-            unit_divisor=1024,
-            desc=model.name,
-        ) as progress:
+        with (
+            temporary.open(write_mode) as file,
+            tqdm(
+                total=total_size,
+                initial=initial_size,
+                unit="B",
+                unit_scale=True,
+                unit_divisor=1024,
+                desc=model.name,
+            ) as progress,
+        ):
             for chunk in response.iter_content(chunk_size=CHUNK_SIZE):
                 if not chunk:
                     continue
@@ -204,10 +205,7 @@ def download(model: Model, force: bool = False) -> None:
                     ) from error
 
                 delay = min(5 * attempt, 30)
-                print(
-                    f"Повтор через {delay} секунд. "
-                    "Загрузка продолжится с сохранённого места."
-                )
+                print(f"Повтор через {delay} секунд. Загрузка продолжится с сохранённого места.")
                 time.sleep(delay)
     finally:
         session.close()
@@ -223,9 +221,7 @@ def list_models() -> None:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(
-        description="Загрузка моделей Face Swap Studio"
-    )
+    parser = argparse.ArgumentParser(description="Загрузка моделей Face Swap Studio")
 
     parser.add_argument(
         "models",
@@ -264,11 +260,7 @@ def main() -> int:
         parser.print_help()
         return 1
 
-    unknown_models = [
-        model_name
-        for model_name in selected_models
-        if model_name not in MODELS
-    ]
+    unknown_models = [model_name for model_name in selected_models if model_name not in MODELS]
 
     if unknown_models:
         print(

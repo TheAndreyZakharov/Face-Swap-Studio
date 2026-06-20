@@ -1,0 +1,24 @@
+===== STYLEMATTE =====
+vendor/ghost2/repos/stylematte/README.md:6:[[`arXiv`](https://arxiv.org/abs/2305.02981)] [[`BibTeX`](#CitingStyleMatte)] [[`Gitlab`](https://gitlab.aicloud.sbercloud.ru/rndcv/stylematte)] [[`Demo`](https://huggingface.co/spaces/befozg/stylematte)] 
+vendor/ghost2/repos/stylematte/README.md:19:| stylematte_pure.pth    | 133.6 MB  |  `stylematte/checkpoints/`        | (https://github.com/chroneus/stylematte/releases/download/weights/stylematte_pure.pth) |
+vendor/ghost2/repos/stylematte/README.md:20:| stylematte_synth.pth | 133.6 MB  |   `stylematte/checkpoints/` | (https://github.com/chroneus/stylematte/releases/download/weights/stylematte_synth.pth)|
+vendor/ghost2/repos/stylematte/README.md:21:| animals.pkl    | 300.5 MB  |    `stylegan3`      | (https://github.com/chroneus/stylematte/releases/download/weights/animals.pkl) |
+vendor/ghost2/repos/stylematte/README.md:22:| humans.pkl    | 281.1 MB  |    `stylegan3`      | (https://github.com/chroneus/stylematte/releases/download/weights/humans.pkl) |
+===== DECA =====
+vendor/ghost2/repos/deca/README.md:12:DECA reconstructs a 3D head model with detailed facial geometry from a single input image. The resulting 3D head model can be easily animated. Please refer to the [arXiv paper](https://arxiv.org/abs/2012.04012) for more details.
+vendor/ghost2/repos/deca/README.md:48:    <!-- or manually download data form [FLAME 2020 model](https://flame.is.tue.mpg.de/download.php) and [DECA trained model](https://drive.google.com/file/d/1rp8kdyLPvErw2dTmqtjISRVvQLj6Yzje/view?usp=sharing), and put them in ./data  -->  
+vendor/ghost2/repos/deca/README.md:50:    follow the instructions for the [Albedo model](https://github.com/TimoBolkart/BFM_to_FLAME) to get 'FLAME_albedo_from_BFM.npz', put it into ./data
+vendor/ghost2/repos/deca/README.md:110:2. Download face recognition trained model  
+vendor/ghost2/repos/deca/README.md:111:    We use the model from [VGGFace2-pytorch](https://github.com/cydonia999/VGGFace2-pytorch) for calculating identity loss,
+vendor/ghost2/repos/deca/README.md:112:    download [resnet50_ft](https://drive.google.com/file/d/1A94PAAnwk6L7hXdBXLFosB_s0SzEhAFU/view),
+vendor/ghost2/repos/deca/README.md:123:    In the yml files, write the right path for 'output_dir' and 'pretrained_modelpath'.  
+vendor/ghost2/repos/deca/README.md:124:    You can also use [released model](https://drive.google.com/file/d/1rp8kdyLPvErw2dTmqtjISRVvQLj6Yzje/view) as pretrained model, then ignor the pretrain step.
+vendor/ghost2/repos/deca/README.md:148:This code and model are available for non-commercial scientific research purposes as defined in the [LICENSE](https://github.com/YadiraF/DECA/blob/master/LICENSE) file.
+vendor/ghost2/repos/deca/README.md:149:By downloading and using the code and model you agree to the terms in the [LICENSE](https://github.com/YadiraF/DECA/blob/master/LICENSE). 
+vendor/ghost2/repos/deca/README.md:154:- [FLAME_PyTorch](https://github.com/soubhiksanyal/FLAME_PyTorch) and [TF_FLAME](https://github.com/TimoBolkart/TF_FLAME) for the FLAME model  
+===== EMOCA =====
+vendor/ghost2/repos/emoca/README.md:71:You can find the [comparison video here](https://download.is.tue.mpg.de/emoca/assets/emoca_v2_comparison.mp4)
+vendor/ghost2/repos/emoca/README.md:82:While using the new version of this repo is recommended, you can still access the old release [here](https://github.com/radekd91/emoca/tree/EMOCA-v1.0).
+vendor/ghost2/repos/emoca/README.md:183:2) For running examples of Emotion Recognition, go to [EmotionRecognition](gdl_apps/EmotionRecognition)
+vendor/ghost2/repos/emoca/README.md:206:- [EmotionRecognition](gdl_apps/EmotionRecognition)
+vendor/ghost2/repos/emoca/README.md:246:This code and model are **available for non-commercial scientific research purposes** as defined in the [LICENSE](https://emoca.is.tue.mpg.de/license.html) file. By downloading and using the code and model you agree to the terms of this license. 

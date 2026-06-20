@@ -1,0 +1,524 @@
+from __future__ import division
+from __future__ import division
+from __future__ import print_function
+from . import amp
+from . import compat
+from . import compat, rnn_compat, utils, wrap
+from . import data, prof
+from . import fp16_utils
+from . import html
+from . import networks
+from . import normalization
+from . import nvtx, prof
+from . import optimizers
+from . import pyprof
+from . import rnn_compat
+from . import torch_overrides
+from . import util
+from . import utils
+from . import utils, wrap
+from ._amp_state import _amp_state
+from ._amp_state import _amp_state, master_params, maybe_print
+from ._amp_state import _amp_state, warn_or_err, container_abcs
+from ._amp_state import _amp_state, warn_or_err, maybe_print
+from ._amp_state import master_params, _amp_state
+from ._amp_state import maybe_print
+from ._initialize import _initialize
+from ._process_optimizer import _process_optimizer
+from .. import amp
+from .. import compat
+from .. import utils
+from ..amp._amp_state import _amp_state, maybe_print
+from ..amp.scaler import LossScaler
+from ..contrib.optimizers import FP16_Optimizer as FP16_Optimizer_for_fused
+from ..fp16_utils import FP16_Optimizer as FP16_Optimizer_general
+from ..fp16_utils import Fused_Weight_Norm
+from ..fp16_utils import master_params_to_model_params
+from ..multi_tensor_apply import multi_tensor_applier
+from ..multi_tensor_apply import multi_tensor_applier
+from ..optimizers import FusedSGD
+from .AADLayer import *
+from .activation import Activation
+from .adversarial import DiscriminatorLoss
+from .amp import init, half_function, float_function, promote_function,\
+from .arcface_loss import ArcFaceLoss
+from .arcface_models import ArcMarginModel
+from .arcface_models import IRBlock
+from .arcface_models import ResNet
+from .arcface_models import SEBlock
+from .asp import ASP
+from .base import OperatorLayerBase
+from .base_model import BaseModel
+from .base_options import BaseOptions
+from .batchnorm import patch_sync_batchnorm, convert_model
+from .batchnorm import SynchronizedBatchNorm1d, SynchronizedBatchNorm2d, SynchronizedBatchNorm3d
+from .blas import *
+from .blender_3p import Decoder
+from .blender_dataset import BlenderDataset
+from .bottleneck import Bottleneck
+from .cells import mLSTMRNNCell, mLSTMCell
+from .collections import OrderedDict
+from .config import device, num_classes
+from .config import device, num_classes
+from .conv import Conv
+from .convert import Convert
+from .data import Data
+from .db import DB
+from .dice import DiceLoss
+from .discriminator import Discriminator
+from .distributed import DistributedDataParallel, Reducer
+from .dropout import Dropout
+from .embedder import Embedder
+from .embedding import Embedding
+from .emotion import EmotionLoss
+from .encdec_multihead_attn import EncdecMultiheadAttn
+from .encdec_multihead_attn_func               import encdec_attn_func
+from .estimate_gaze_pytorch import GazeEstimator
+from .faceshifter_run import faceshifter_batch
+from .fast_encdec_multihead_attn_func          import fast_encdec_attn_func
+from .fast_encdec_multihead_attn_norm_add_func import fast_encdec_attn_norm_add_func
+from .fast_self_multihead_attn_func          import fast_self_attn_func
+from .fast_self_multihead_attn_norm_add_func import fast_self_attn_norm_add_func
+from .fmha import FMHAFun
+from .fp16_optimizer import FP16_Optimizer
+from .fp16util import (
+from .fp16util import model_grads_to_master_grads, master_params_to_model_params, clip_grad_norm
+from .fpn import FPN
+from .frontend import *
+from .frontend import initialize, state_dict, load_state_dict
+from .fs_networks_fix import Generator_Adain_Upsample
+from .fused_adagrad import FusedAdagrad
+from .fused_adam import FusedAdam
+from .fused_lamb import FusedLAMB
+from .fused_layer_norm import FusedLayerNorm
+from .fused_novograd import FusedNovoGrad
+from .fused_sgd import FusedSGD
+from .gaze import GazeLossRTGene
+from .gaze_estimation_models_pytorch import GazeEstimationModel
+from .gaze_tools import (
+from .gaze_tools import FaceBox, get_normalised_eye_landmarks, torch_warpaffine
+from .gaze_tools import freeze_model
+from .generator import Generator
+from .handle import AmpHandle, NoOpHandle
+from .handle import disable_casts
+from .handle import scale_loss, disable_casts
+from .image_processing import crop_face, normalize_and_torch, normalize_and_torch_batch
+from .image_processing import normalize_and_torch, normalize_and_torch_batch, crop_face
+from .image_processing import torch2image
+from .index_slice_join_mutate import Cat, Reshape, MaskedScatter, Gather, Nonzero, IndexSelect, MaskedSelect
+from .kernel import Kernel
+from .keypoint import KeypointLoss
+from .layer_norm import FastLayerNorm
+from .linear import Linear
+from .lists import functional_overrides, torch_overrides, tensor_overrides
+from .loss import MSELoss
+from .loss_scaler import LossScaler, DynamicLossScaler
+from .lpips import LPIPS
+from .mask_softmax_dropout_func import fast_mask_softmax_dropout_func
+from .masks import face_mask_static
+from .masks import face_mask_static 
+from .misc import *
+from .mlp import *
+from .models import ArcMarginModel
+from .models import IRBlock
+from .models import LSTM, GRU, ReLU, Tanh, mLSTM
+from .models import ResNet
+from .models import SEBlock
+from .multi_tensor_apply import MultiTensorApply
+from .normalization import BatchNorm
+from .nvmarker import add_wrapper as wrap
+from .nvmarker import init
+from .nvvp import NVVP
+from .opt import OptimWrapper
+from .optim import Adam
+from .optimized_sync_batchnorm_kernel import SyncBatchnormFunction
+from .output import Output
+from .perceptual_vgg import PerceptualLoss
+from .pointwise import Pointwise
+from .preblending import dilate_torch
+from .preprocess import make_X_dict
+from .psnr import PSNR
+from .randomSample import RandPerm
+from .recurrentCell import RNNCell
+from .reduction import *
+from .reg_loss import ReferenceRegularizationLoss
+from .reparameterization import Reparameterization
+from .replicate import DataParallelWithCallback, patch_replication_callback
+from .RNNBackend import bidirectionalRNN, stackedRNN, RNNCell
+from .RNNBackend import RNNCell
+from .rt_gaze_estimation_models import (
+from .rt_gene_loss_fb.gaze_tools import FaceBox
+from .rt_gene_loss_fb.rt_gene_estimator import RtGeneEstimator
+from .sampler import CustomBatchSampler
+from .scaler import LossScaler
+from .scaler import LossScaler, master_params
+from .self_multihead_attn import SelfMultiheadAttn
+from .self_multihead_attn_func               import self_attn_func
+from .softmax import *
+from .sparse_masklib import create_mask
+from .ssim import SSIM, MS_SSIM
+from .sync_batchnorm_kernel import SyncBatchnormFunction
+from .tracker_generic import TrackedSubject
+from .transducer import TransducerJoint
+from .transducer import TransducerLoss
+from .usage import parseArgs
+from .utility import Utility
+from .video_processing import read_video, crop_frames_and_get_transforms, resize_frames
+from .voxceleb import Voxceleb2H5Dataset
+from .weight_norm import WeightNorm
+from abc import ABC, abstractmethod
+from AdaptiveWingLoss.core import models
+from AdaptiveWingLoss.utils.utils import get_preds_fromhm
+from apex import amp
+from apex import pyprof
+from apex.amp import _amp_state
+from apex.contrib import xentropy as label_smoothing
+from apex.contrib.layer_norm import FastLayerNorm
+from apex.contrib.multihead_attn import EncdecMultiheadAttn
+from apex.contrib.multihead_attn import fast_mask_softmax_dropout_func
+from apex.contrib.multihead_attn import SelfMultiheadAttn
+from apex.contrib.optimizers.distributed_fused_adam import DistributedFusedAdam
+from apex.contrib.sparsity import ASP
+from apex.contrib.transducer import TransducerJoint
+from apex.contrib.transducer import TransducerLoss
+from apex.fp16_utils import convert_network
+from apex.fp16_utils import FP16Model
+from apex.mlp import MLP
+from apex.multi_tensor_apply import multi_tensor_applier
+from apex.normalization import FusedLayerNorm
+from apex.normalization.fused_layer_norm       import FusedLayerNorm
+from apex.normalization.fused_layer_norm     import FusedLayerNorm
+from apex.optimizers import FusedAdam
+from apex.optimizers import FusedAdam, FP16_Optimizer
+from apex.parallel import DistributedDataParallel
+from apex.parallel import DistributedDataParallel as DDP
+from apex.parallel import ReduceOp
+from apex.parallel import SyncBatchNorm as ApexSyncBatchNorm
+from apex.parallel.LARC import LARC
+from apex.parallel.sync_batchnorm import SyncBatchNorm
+from apex.pyprof.prof.data import Data
+from apex.pyprof.prof.prof import foo
+from arcface_model.iresnet import iresnet100
+from argparse import Namespace
+from bottleneck import Bottleneck
+from collections import defaultdict
+from collections import namedtuple
+from collections import OrderedDict
+from coordinate_reg.image_infer import Handler
+from copy import copy
+from data.data_loader_Swapping import GetLoader
+from diffusers import AutoPipelineForInpainting
+from diffusers.utils import load_image
+from docutils import nodes
+from dominate.tags import *
+from einops import rearrange, repeat
+from enum import Enum
+from functools import partial
+from functools import reduce
+from functools import wraps
+from glob import glob
+from insightface_func.face_detect_crop_multi import Face_detect_crop
+from insightface_func.face_detect_crop_multi import Face_detect_crop as Face_detect_crop_multi
+from insightface_func.face_detect_crop_single import Face_detect_crop
+from insightface_func.face_detect_crop_single import Face_detect_crop as Face_detect_crop_single
+from insightface_func.utils import face_align_ffhqandnewarc as face_align
+from insightface.app import FaceAnalysis
+from insightface.model_zoo import model_zoo
+from insightface.model_zoo import model_zoo
+from insightface.utils import face_align
+from insightface.utils import face_align
+from io import BytesIO
+from itertools import chain
+from itertools import permutations
+from itertools import product
+from lightning.pytorch.callbacks import ModelCheckpoint
+from lightning.pytorch.loggers import TensorBoardLogger
+from lightning.pytorch.loggers import WandbLogger
+from math import floor
+from matplotlib import pyplot as plt
+from models.config_sr import TestOptions
+from models.models import create_model
+from models.networks.architecture import ResnetBlock as ResnetBlock
+from models.networks.architecture import SPADEResnetBlock as SPADEResnetBlock
+from models.networks.architecture import VGG19
+from models.networks.base_network import BaseNetwork
+from models.networks.discriminator import *
+from models.networks.encoder import *
+from models.networks.generator import *
+from models.networks.loss import *
+from models.networks.normalization import get_nonspade_norm_layer
+from models.networks.normalization import SPADE
+from models.networks.sync_batchnorm import SynchronizedBatchNorm2d
+from models.pix2pix_model import Pix2PixModel
+from models.projected_model import fsModel
+from moviepy.editor import AudioFileClip, VideoFileClip 
+from moviepy.video.io.ImageSequenceClip import ImageSequenceClip
+from network.AEI_Net import *
+from network.AEI_Net import AEI_Net
+from network.MultiscaleDiscriminator import *
+from network.resnet import MLAttrEncoderResnet
+from omegaconf import OmegaConf
+from options.test_options import TestOptions
+from packaging import version
+from parsing_model.model import BiSeNet
+from parsing_model.resnet import Resnet18
+from pathlib import Path
+from pg_modules.blocks import DownBlock, DownBlockPatch, conv2d
+from pg_modules.blocks import FeatureFusionBlock
+from pg_modules.diffaug import DiffAugment
+from pg_modules.projected_discriminator import ProjectedDiscriminator
+from pg_modules.projector import F_RandomProj
+from PIL import Image
+from pytorch_msssim import ssim, ms_ssim
+from repos.BlazeFace_PyTorch.blazeface import BlazeFace
+from repos.DECA.decalib.deca import DECA
+from repos.DECA.decalib.utils import util
+from repos.emoca.gdl_apps.EmotionRecognition.utils.io import load_model, test
+from repos.emoca.gdl.datasets.ImageDatasetHelpers import bbox2point
+from repos.stylematte.stylematte.models import StyleMatte
+from scipy.spatial import distance
+from setuptools import setup, find_packages
+from simple_lama_inpainting import SimpleLama
+from skimage import transform as trans
+from sphinx import addnodes
+from sphinx.util.docfields import TypedField
+from src.aligner import *
+from src.aligner import Discriminator
+from src.aligner.iresnet import iresnet50
+from src.blender.generator import BlenderGenerator
+from src.blender.utils import (
+from src.data import BlenderDataset
+from src.data import CustomBatchSampler
+from src.data import Voxceleb2H5Dataset
+from src.data import Voxceleb2H5Dataset, CustomBatchSampler
+from src.losses import *
+from src.losses import PerceptualLoss, DiscriminatorLoss
+from src.losses import ReferenceRegularizationLoss
+from src.utils.color_conversion import *
+from src.utils.crops import *
+from src.utils.crops import emoca_crop
+from src.utils.crops import wide_crop_face, crop_face, emoca_crop
+from src.utils.inference import *
+from src.utils.inpainter import LamaInpainter
+from src.utils.keypoint_detector import DECAKeypoints
+from src.utils.logging import LogPredictionSamplesCallback, PeriodicCheckpoint
+from src.utils.preblending import calc_pseudo_target_bg, post_inpainting
+from src.utils.preprocess import calc_arcface_borders
+from src.utils.preprocess import make_X_dict, blend_alpha
+from sync_batchnorm import SynchronizedBatchNorm1d, SynchronizedBatchNorm2d, DataParallelWithCallback
+from sync_batchnorm.batchnorm_reimpl import BatchNorm2dReimpl
+from sync_batchnorm.unittest import TorchTestCase
+from test_fused_optimizer import TestFusedOptimizer
+from test_wholeimage_swapmulti import _totensor
+from time import time
+from torch import nn
+from torch import nn
+from torch import nn, einsum
+from torch._six import string_classes
+from torch._utils import _flatten_dense_tensors, _unflatten_dense_tensors
+from torch._utils import _flatten_dense_tensors, _unflatten_dense_tensors
+from torch.autograd import Variable
+from torch.autograd import Variable
+from torch.autograd.function import Function
+from torch.backends import cudnn
+from torch.nn import Flatten
+from torch.nn import functional as F
+from torch.nn import init
+from torch.nn import Module
+from torch.nn import Parameter
+from torch.nn import Parameter
+from torch.nn._functions.rnn import LSTMCell, RNNReLUCell, RNNTanhCell, GRUCell
+from torch.nn._functions.thnn import rnnFusedPointwise as fusedBackend
+from torch.nn.modules import Module
+from torch.nn.modules.batchnorm import _BatchNorm
+from torch.nn.parallel import DistributedDataParallel as DDP
+from torch.nn.parallel.data_parallel import DataParallel
+from torch.nn.parameter import Parameter
+from torch.nn.parameter import Parameter
+from torch.nn.utils import spectral_norm
+from torch.optim import Optimizer
+from torch.optim.optimizer import Optimizer, required
+from torch.utils import cpp_extension
+from torch.utils import data
+from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, Dataset
+from torch.utils.data import TensorDataset
+from torchvision import models
+from torchvision import transforms
+from torchvision import transforms as T
+from torchvision.transforms import ToTensor
+from torchvision.transforms import ToTensor, ToPILImage
+from torchvision.transforms.functional import rgb_to_grayscale
+from torchvision.transforms.functional import to_pil_image
+from tqdm import tqdm
+from train_aligner import AlignerModule
+from train_blender import BlenderModule
+from types import MethodType
+from typing import Callable, List
+from typing import List
+from typing import List, Optional
+from typing import List, Optional, Tuple, Union
+from typing import List, Tuple, Callable, Any
+from typing import List, Tuple, Union
+from typing import Optional
+from typing import Tuple
+from typing import Tuple, List
+from typing import Union
+from util import util
+from util.add_watermark import watermark_image
+from util.image_pool import ImagePool
+from util.norm import SpecificNorm
+from util.plot import plot_batch
+from util.reverse2original import reverse2wholeimage
+from util.videoswap import video_swap
+from util.videoswap_multispecific import video_swap
+from util.videoswap_specific import video_swap
+from utils import common_init
+from utils import common_init, FLOAT
+from utils import common_init, HALF
+from utils import common_init, HALF, FLOAT, DTYPES
+from utils import common_init, HALF, FLOAT,\
+from utils.inference.core import model_inference
+from utils.inference.image_processing import crop_face, get_final_image
+from utils.inference.video_processing import read_video, get_target, get_final_video, add_audio_from_another_video, face_enhancement
+from utils.training.Dataset import FaceEmbedVGG2, FaceEmbed
+from utils.training.detector import detect_landmarks, paint_eyes
+from utils.training.image_processing import make_image_list, get_faceswap
+from utils.training.losses import hinge_loss, compute_discriminator_loss, compute_generator_losses
+import  json
+import  time
+import amp_C
+import apex
+import argparse
+import base64
+import bnp
+import cog
+import collections
+import collections
+import contextlib
+import copy
+import cv2
+import cv2
+import cxxfilt, struct, binascii
+import dill as pickle
+import dominate
+import errno, os, sys
+import face_alignment
+import fast_additive_mask_softmax_dropout
+import fast_bottleneck
+import fast_encdec_multihead_attn
+import fast_encdec_multihead_attn_norm_add
+import fast_layer_norm
+import fast_layer_norm as fln
+import fast_mask_softmax_dropout
+import fast_self_multihead_attn
+import fast_self_multihead_attn_bias
+import fast_self_multihead_attn_bias_additive_mask
+import fast_self_multihead_attn_norm_add
+import fmhalib as mha
+import fractions
+import functools
+import functools as ft
+import fused_adam_cuda
+import fused_layer_norm_cuda
+import glob
+import glob
+import h5py
+import imgaug.augmenters as iaa
+import importlib
+import insightface
+import inspect
+import inspect as ins
+import itertools
+import itertools as it
+import kornia
+import lightning.pytorch as pl
+import logging
+import lpips
+import math
+import math
+import math 
+import matplotlib.pyplot as plt
+import mlp_cuda
+import models.networks as networks
+import moviepy.editor as mp
+import mxnet as mx
+import ntpath
+import numbers
+import numpy
+import numpy as np
+import numpy as np
+import onnxruntime as ort
+import operator
+import os
+import os
+import os 
+import os.path as osp
+import os.path as osp
+import pdb
+import pickle
+import PIL
+import queue
+import random
+import re
+import repos.DECA.decalib.utils.config as config
+import scipy.misc
+import seaborn as sns
+import shutil
+import sphinx_rtd_theme
+import src.blocks as blocks
+import src.utils.kornia_morphology
+import subprocess
+import syncbn
+import sys
+import sys
+import sys, sqlite3
+import tempfile
+import test_pyprof_nvtx.TestPyProfNvtx as TestPyProfNvtx
+import threading
+import time
+import time
+import timm
+import torch
+import torch
+import torch, math
+import torch.backends.cudnn as cudnn
+import torch.cuda.nvtx as nvtx
+import torch.cuda.profiler as profiler
+import torch.distributed as dist
+import torch.distributed.distributed_c10d as c10d
+import torch.nn as nn
+import torch.nn.functional
+import torch.nn.functional as F
+import torch.nn.functional as F
+import torch.nn.init as init
+import torch.nn.parallel
+import torch.nn.utils.spectral_norm as spectral_norm
+import torch.optim
+import torch.optim as optim
+import torch.optim.lr_scheduler as scheduler
+import torch.utils.data
+import torch.utils.data.distributed
+import torch.utils.model_zoo as modelzoo
+import torch.utils.tensorboard as tensorboard
+import torchvision
+import torchvision.datasets as datasets
+import torchvision.datasets as dset
+import torchvision.models as models
+import torchvision.transforms as transforms
+import torchvision.transforms.functional as TF
+import torchvision.utils as vutils
+import tqdm
+import traceback
+import transducer_joint_cuda
+import transducer_loss_cuda
+import transducer_ref
+import types
+import unittest
+import unittest
+import util.util as util
+import utils.inference.util as util
+import wandb
+import warnings
+import xentropy_cuda
+import yaml

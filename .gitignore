@@ -23,10 +23,6 @@ models/swappers/ghost2/*
 !models/swappers/simswap512/.gitkeep
 !models/swappers/ghost/.gitkeep
 !models/swappers/ghost2/.gitkeep
-project-structure.txt
-external-models-manifest.txt
-full-repository-tree.txt
-diagnostics/
 
 # Neural-network weights and external repositories
 gfpgan/

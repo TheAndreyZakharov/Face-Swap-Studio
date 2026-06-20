@@ -1,9 +1,10 @@
 application:
   name: "Face Swap Studio"
-  version: "0.1.0"
+  version: "0.2.0"
   host: "127.0.0.1"
   port: 7860
   share: false
+  open_browser: true
 
 paths:
   input: "data/input"
@@ -15,37 +16,34 @@ paths:
   upscalers: "models/upscalers"
 
 runtime:
-  preferred_provider: "CoreMLExecutionProvider"
-  fallback_provider: "CPUExecutionProvider"
+  preferred_onnx_providers:
+    - "CoreMLExecutionProvider"
+    - "CPUExecutionProvider"
   torch_device: "mps"
   allow_cpu_fallback: true
-  parallel_jobs: 1
+  external_timeout_seconds: 3600
 
 detection:
   model: "buffalo_l"
   input_size: 640
   confidence_threshold: 0.5
-  maximum_faces: 50
+  maximum_faces: 100
   sort_order: "left-to-right"
 
-swapping:
-  default_model: null
-  pixel_boost: 512
-  preserve_expression: true
-  blend_strength: 1.0
-
-face_enhancement:
-  enabled: false
-  model: "GFPGANv1.4"
-  weight: 0.35
-
-image_enhancement:
-  enabled: false
-  model: "RealESRGAN_x4plus"
-  scale: 2
-  tile_size: 256
-
-output:
-  format: "png"
+processing:
+  default_swapper: "inswapper_128"
+  output_format: "png"
   jpeg_quality: 95
   preserve_metadata: false
+  apply_face_enhancement_after_swap: false
+  apply_upscaling_after_swap: false
+
+face_enhancement:
+  model: "GFPGANv1.4"
+  default_weight: 0.35
+
+image_enhancement:
+  model: "RealESRGAN_x4plus"
+  default_scale: 2.0
+  default_tile_size: 256
+  maximum_output_side: 8000

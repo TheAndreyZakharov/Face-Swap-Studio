@@ -1,0 +1,39 @@
+vendor/ghost/apex/apex/fp16_utils/fp16_optimizer.py:219:            torch.save(checkpoint, "saved.pth")
+vendor/ghost/apex/apex/fp16_utils/fp16_optimizer.py:244:            checkpoint = torch.load("saved.pth")
+vendor/ghost/apex/apex/contrib/optimizers/distributed_fused_adam.py:605:            torch.save(checkpoint, "saved.pth")
+vendor/ghost/apex/apex/contrib/optimizers/distributed_fused_adam.py:627:            checkpoint = torch.load("saved.pth")
+vendor/ghost/apex/apex/contrib/optimizers/fp16_optimizer.py:188:            torch.save(checkpoint, "saved.pth")
+vendor/ghost/apex/apex/contrib/optimizers/fp16_optimizer.py:214:            checkpoint = torch.load("saved.pth")
+vendor/ghost/apex/apex/contrib/optimizers/distributed_fused_lamb.py:691:            torch.save(checkpoint, "saved.pth")
+vendor/ghost/apex/apex/contrib/optimizers/distributed_fused_lamb.py:713:            checkpoint = torch.load("saved.pth")
+vendor/ghost/apex/tests/distributed/amp_master_params/amp_master_params.py:69:torch.save(list(model.parameters()), "rank{}model.pth".format(torch.distributed.get_rank()))
+vendor/ghost/apex/tests/distributed/amp_master_params/amp_master_params.py:70:torch.save(list(amp.master_params(optimizer)), "rank{}master.pth".format(torch.distributed.get_rank()))
+vendor/ghost/apex/tests/distributed/amp_master_params/compare.py:3:model_params_rank0 = torch.load("rank0model.pth",
+vendor/ghost/apex/tests/distributed/amp_master_params/compare.py:5:model_params_rank1 = torch.load("rank1model.pth",
+vendor/ghost/apex/tests/distributed/amp_master_params/compare.py:7:master_params_rank0 = torch.load("rank0master.pth",
+vendor/ghost/apex/tests/distributed/amp_master_params/compare.py:9:master_params_rank1 = torch.load("rank1master.pth",
+vendor/ghost/apex/tests/L1/common/main_amp.py:459:def save_checkpoint(state, is_best, filename='checkpoint.pth.tar'):
+vendor/ghost/apex/tests/L1/common/main_amp.py:462:        shutil.copyfile(filename, 'model_best.pth.tar')
+vendor/ghost/apex/examples/dcgan/main_amp.py:271:    torch.save(netG.state_dict(), '%s/netG_epoch_%d.pth' % (opt.outf, epoch))
+vendor/ghost/apex/examples/dcgan/main_amp.py:272:    torch.save(netD.state_dict(), '%s/netD_epoch_%d.pth' % (opt.outf, epoch))
+vendor/ghost/apex/examples/imagenet/main_amp.py:476:def save_checkpoint(state, is_best, filename='checkpoint.pth.tar'):
+vendor/ghost/apex/examples/imagenet/main_amp.py:479:        shutil.copyfile(filename, 'model_best.pth.tar')
+vendor/ghost/insightface_func/face_detect_crop_single.py:26:        onnx_files = glob.glob(osp.join(root, name, '*.onnx'))
+vendor/ghost/insightface_func/face_detect_crop_multi.py:26:        onnx_files = glob.glob(osp.join(root, name, '*.onnx'))
+vendor/ghost/utils/training/Dataset.py:25:            # with open(f'{data_path}/embed.pkl', 'rb') as f:
+vendor/ghost/utils/inference/util.py:197:    save_filename = '%s_net_%s.pth' % (epoch, label)
+vendor/ghost/utils/inference/util.py:205:    save_filename = '%s_net_%s.pth' % (epoch, label)
+vendor/ghost/models/networks/generator.py:651:            'pretrained_net_E_%d.pth' % epochs
+vendor/ghost/models/networks/generator.py:675:                    self.opt.checkpoints_dir, self.opt.name, 'pretrained_net_E_%d.pth' % epoch
+vendor/ghost/models/networks/generator.py:740:            'pretrained_net_E_%d.pth' % epochs
+vendor/ghost/models/networks/generator.py:762:                    self.opt.checkpoints_dir, self.opt.name, 'pretrained_net_E_%d.pth' % epoch
+vendor/ghost/train.py:138:            torch.save(G.state_dict(), f'./saved_models_{args.run_name}/G_latest.pth')
+vendor/ghost/train.py:139:            torch.save(D.state_dict(), f'./saved_models_{args.run_name}/D_latest.pth')
+vendor/ghost/train.py:141:            torch.save(G.state_dict(), f'./current_models_{args.run_name}/G_' + str(epoch)+ '_' + f"{iteration:06}" + '.pth')
+vendor/ghost/train.py:142:            torch.save(D.state_dict(), f'./current_models_{args.run_name}/D_' + str(epoch)+ '_' + f"{iteration:06}" + '.pth')
+vendor/ghost/train.py:179:    netArc.load_state_dict(torch.load('arcface_model/backbone.pth'))
+vendor/ghost/train.py:185:        checkpoint = torch.load('./AdaptiveWingLoss/AWL_detector/WFLW_4HG.pth')
+vendor/ghost/train.py:260:    parser.add_argument('--G_path', default='./saved_models/G.pth', help='Path to pretrained weights for G. Only used if pretrained=True')
+vendor/ghost/train.py:261:    parser.add_argument('--D_path', default='./saved_models/D.pth', help='Path to pretrained weights for D. Only used if pretrained=True')
+vendor/ghost/inference.py:34:    netArc.load_state_dict(torch.load('arcface_model/backbone.pth'))
+vendor/ghost/inference.py:131:    parser.add_argument('--G_path', default='weights/G_unet_2blocks.pth', type=str, help='Path to weights for G')

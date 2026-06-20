@@ -1,0 +1,17 @@
+vendor/simswap/test_wholeimage_swapmulti.py:100:            save_pth = os.path.join('./parsing_model/checkpoint', '79999_iter.pth')
+vendor/simswap/options/test_options.py:25:        self.parser.add_argument("--Arc_path", type=str, default='arcface_model/arcface_checkpoint.tar', help="run ONNX model via TRT")
+vendor/simswap/insightface_func/face_detect_crop_single.py:34:        onnx_files = glob.glob(osp.join(root, name, '*.onnx'))
+vendor/simswap/insightface_func/face_detect_crop_multi.py:34:        onnx_files = glob.glob(osp.join(root, name, '*.onnx'))
+vendor/simswap/parsing_model/resnet.py:11:resnet18_url = 'https://download.pytorch.org/models/resnet18-5c106cde.pth'
+vendor/simswap/util/videoswap.py:62:        save_pth = os.path.join('./parsing_model/checkpoint', '79999_iter.pth')
+vendor/simswap/util/videoswap_specific.py:57:        save_pth = os.path.join('./parsing_model/checkpoint', '79999_iter.pth')
+vendor/simswap/util/videoswap_multispecific.py:57:        save_pth = os.path.join('./parsing_model/checkpoint', '79999_iter.pth')
+vendor/simswap/test_wholeimage_swap_multispecific.py:162:                save_pth = os.path.join('./parsing_model/checkpoint', '79999_iter.pth')
+vendor/simswap/predict.py:41:        opt = options.parser.parse_args(["--Arc_path", 'arcface_model/arcface_checkpoint.tar', "--pic_a_path", str(source),
+vendor/simswap/models/base_model.py:43:        save_filename = '{}_net_{}.pth'.format(epoch_label, network_label)
+vendor/simswap/models/base_model.py:50:        save_filename = '{}_optim_{}.pth'.format(epoch_label, network_label)
+vendor/simswap/models/base_model.py:57:        save_filename = '%s_net_%s.pth' % (epoch_label, network_label)
+vendor/simswap/models/base_model.py:98:        save_filename = '%s_optim_%s.pth' % (epoch_label, network_label)
+vendor/simswap/test_wholeimage_swapspecific.py:132:        save_pth = os.path.join('./parsing_model/checkpoint', '79999_iter.pth')
+vendor/simswap/train.py:67:        self.parser.add_argument("--Arc_path", type=str, default='arcface_model/arcface_checkpoint.tar', help="run ONNX model via TRT")
+vendor/simswap/test_wholeimage_swapsingle.py:99:            save_pth = os.path.join('./parsing_model/checkpoint', '79999_iter.pth')

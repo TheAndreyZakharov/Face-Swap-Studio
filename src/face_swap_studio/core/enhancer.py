@@ -3,8 +3,8 @@ from __future__ import annotations
 from functools import lru_cache
 
 import numpy as np
-from gfpgan import GFPGANer
 
+from gfpgan import GFPGANer
 from src.face_swap_studio.models.model_manager import gfpgan_model_path
 from src.face_swap_studio.utils.logging import get_logger
 
@@ -28,18 +28,22 @@ def enhance_faces(
     image_bgr: np.ndarray,
     weight: float = 0.35,
 ) -> np.ndarray:
-    weight = float(np.clip(weight, 0.0, 1.0))
+    if image_bgr is None or image_bgr.size == 0:
+        raise ValueError("Нельзя улучшить пустое изображение.")
 
+    normalized_weight = float(np.clip(weight, 0.0, 1.0))
     enhancer = get_face_enhancer()
+
     _, _, restored = enhancer.enhance(
         image_bgr,
         has_aligned=False,
         only_center_face=False,
         paste_back=True,
-        weight=weight,
+        weight=normalized_weight,
     )
 
     if restored is None:
-        return image_bgr
+        logger.warning("GFPGAN не вернул восстановленное изображение.")
+        return image_bgr.copy()
 
     return restored

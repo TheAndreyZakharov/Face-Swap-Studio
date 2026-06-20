@@ -1,0 +1,172 @@
+===== GHOST2 FILES =====
+vendor/ghost2/configs/aligner.yaml
+vendor/ghost2/configs/blender_demo.yaml
+vendor/ghost2/configs/blender.yaml
+vendor/ghost2/inference.py
+vendor/ghost2/preprocess_image.py
+vendor/ghost2/README.md
+vendor/ghost2/repos/blazeface/blazeface.py
+vendor/ghost2/repos/deca/docker-compose.yml
+vendor/ghost2/repos/deca/main_train.py
+vendor/ghost2/repos/deca/README.md
+vendor/ghost2/repos/emoca/__init__.py
+vendor/ghost2/repos/emoca/conda-environment_py36_cu11_ubuntu.yml
+vendor/ghost2/repos/emoca/conda-environment_py38_cu11_ubuntu.yml
+vendor/ghost2/repos/emoca/README.md
+vendor/ghost2/repos/emoca/setup.py
+vendor/ghost2/repos/stylematte/README.md
+vendor/ghost2/src/aligner/__init__.py
+vendor/ghost2/src/aligner/discriminator.py
+vendor/ghost2/src/aligner/embedder.py
+vendor/ghost2/src/aligner/generator.py
+vendor/ghost2/src/aligner/iresnet.py
+vendor/ghost2/src/blender/blender_3p.py
+vendor/ghost2/src/blender/fpn.py
+vendor/ghost2/src/blender/generator.py
+vendor/ghost2/src/blender/utils.py
+vendor/ghost2/src/blocks.py
+vendor/ghost2/src/data/__init__.py
+vendor/ghost2/src/data/blender_dataset.py
+vendor/ghost2/src/data/sampler.py
+vendor/ghost2/src/data/voxceleb.py
+vendor/ghost2/src/losses/__init__.py
+vendor/ghost2/src/losses/adversarial.py
+vendor/ghost2/src/losses/arcface_loss.py
+vendor/ghost2/src/losses/dice.py
+vendor/ghost2/src/losses/emotion.py
+vendor/ghost2/src/losses/gaze.py
+vendor/ghost2/src/losses/keypoint.py
+vendor/ghost2/src/losses/lpips.py
+vendor/ghost2/src/losses/perceptual_vgg.py
+vendor/ghost2/src/losses/psnr.py
+vendor/ghost2/src/losses/reg_loss.py
+vendor/ghost2/src/losses/ssim.py
+vendor/ghost2/src/utils/color_conversion.py
+vendor/ghost2/src/utils/crops.py
+vendor/ghost2/src/utils/inference.py
+vendor/ghost2/src/utils/inpainter.py
+vendor/ghost2/src/utils/keypoint_detector.py
+vendor/ghost2/src/utils/kornia_morphology.py
+vendor/ghost2/src/utils/logging.py
+vendor/ghost2/src/utils/preblending.py
+vendor/ghost2/src/utils/preprocess.py
+vendor/ghost2/train_aligner.py
+vendor/ghost2/train_blender.py
+
+===== GHOST2 README =====
+# GHOST 2.0: Generative High-fidelity One Shot Transfer of Heads
+
+<a href='https://arxiv.org/abs/2502.18417'><img src='https://img.shields.io/badge/Paper-Arxiv-red'></a>        <a href='https://huggingface.co/spaces/ai-forever/GHOST-2.0'><img src='https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Demo-green'></a>        <a href='https://ai-forever.github.io/ghost-2.0/'><img src='https://img.shields.io/badge/Project-Page-blue?style=flat&logo=Google%20chrome&logoColor=blue'></a>
+
+![teaser](https://github.com/user-attachments/assets/60b35f78-99d6-4c4a-90b4-b694402c9e6c)
+
+
+We present GHOST 2.0, a novel approach for realistic head swapping. Our solution transfers head from source image to the target one in a natural way, seamessly blending with the target background and skin color. 
+
+While the task of face swapping (see our [GHOST](https://github.com/ai-forever/ghost) model) has recently gained attention in the research community, a related problem of head swapping remains largely unexplored. In addition to skin color transfer, head swap poses extra challenges, such as the need to preserve structural information of the whole head during synthesis and inpaint gaps between swapped head and background. We address these concerns with GHOST 2.0, which consists of two problem-specific modules. First, we introduce a new Aligner model for head reenactment, which preserves identity information at multiple scales and is robust to extreme pose variations. Secondly, we use a Blender module that seamlessly integrates the reenacted head into the target background by transferring skin color and inpainting mismatched regions. Both modules outperform the baselines on the corresponding tasks, allowing to achieve state-of-the-art results in head swapping. We also tackle complex cases, such as large difference in hair styles of source and driver. For more details on our solution, please refer to the paper.
+
+## Installation
+Install conda environment:
+```
+conda create -n ghost python=3.10
+
+pip install face-alignment
+pip install facenet_pytorch
+
+conda config --add channels conda-forge
+conda config --set channel_priority strict
+pip install -U 'git+https://github.com/facebookresearch/fvcore'
+conda install pytorch3d -c pytorch3d-nightly
+
+pip install -r requirements.txt
+python -m pip uninstall numpy
+python -m pip install numpy==1.23.1
+```
+Clone the following repositories in the ```repos``` folder. Download respective checkpoints:
+
+[DECA](https://github.com/yfeng95/DECA)
+
+[EMOCA](https://github.com/anastasia-yaschenko/EMOCA)
+
+[BlazeFace](https://github.com/anastasia-yaschenko/BlazeFace_PyTorch)
+
+[stylematte](https://github.com/chroneus/stylematte)
+
+For EMOCA, download ResNet50 folder from [here](https://github.com/anastasia-yaschenko/emoca/releases/tag/resnet) and unpack into ```repos/emoca/gdl_apps/EmotionRecognition/``` and ```assets/EmotionRecognition/image_based_networks/```
+
+Download the models from releases. Place them into the following folders
+```
+- aligner_checkpoints
+    - aligner_1020_gaze_final.ckpt
+- blender_checkpoints
+    - blender_lama.ckpt
+
+- src
+    - losses
+        - gaze_models
+ 
+- weights
+    - backbone50_1.pth
+    - vgg19-d01eb7cb.pth
+    - segformer_B5_ce.onnx
+```
+
+## Inference
+For inference use ```inference.ipynb``` or run
+```
+python inference.py --source ./examples/images/hab.jpg --target ./examples/images/elon.jpg --save_path result.png
+```
+
+## Training
+1. Download VoxCeleb2. We expect the following structure of data directory and assume images are stored in BGR format:
+```
+- train
+    - person_id
+        - video_folder
+            -h5 video files
+-test
+```
+2. Preprocess data according to the example in file ```preprocess_image.py```
+3. To train Aligner, run ```python train_aligner.py```
+4. To train Blender, run ```python train_blender.py```
+
+## Citation
+If you find our method useful in your research, please consider citing
+```
+@misc{groshev2025ghost2
+      title={GHOST 2.0: generative high-fidelity one shot transfer of heads}, 
+      author={Alexander Groshev and Anastasiia Iashchenko and Pavel Paramonov and Denis Dimitrov and Andrey Kuznetsov},
+      year={2025},
+      eprint={2502.18417},
+      archivePrefix={arXiv},
+      primaryClass={cs.CV},
+      url={https://arxiv.org/abs/2502.18417}, 
+}
+```
+
+## Ethics
+Deep fake synthesis methods have been improved a lot in quality in recent years. The research solutions were wrapped in easy-to-use API, software and different plugins for people with a little technical knowledge. As a result, almost anyone is able to make a deepfake image or video by just doing a short list of simple operations. At the same time, a lot of people with malicious intent are able to use this technology in order to produce harmful content. High distribution of such a content over the web leads to caution, disfavor and other negative feedback to deepfake synthesis or head swap research.
+
+As a group of researchers, we are not trying to denigrate celebrities and statesmen or to demean anyone. We are computer vision researchers, we are engineers, we are activists, we are hobbyists, we are human beings. To this end, we feel that it's time to come out with a standard statement of what this technology is and isn't as far as us researchers are concerned.
+
+GHOST 2.0 is not for creating inappropriate content.
+GHOST 2.0 is not for changing heads without consent or with the intent of hiding its use.
+GHOST 2.0 is not for any illicit, unethical, or questionable purposes.
+GHOST 2.0 exists to experiment and discover AI techniques, for social or political commentary, for movies, and for any number of ethical and reasonable uses.
+We are very troubled by the fact that GHOST 2.0 can be used for unethical and disreputable things. However, we support the development of tools and techniques that can be used ethically as well as provide education and experience in AI for anyone who wants to learn it hands-on. Now and further, we take a zero-tolerance approach and total disregard to anyone using this software for any unethical purposes and will actively discourage any such uses.
+
+## Acknowledgements
+This work utilizes code from the follwing repositories:
+
+[Neural Head Reenactment with Latent Pose Descriptors](https://github.com/shrubb/latent-pose-reenactment)
+
+[EMOPortraits: Emotion-enhanced Multimodal One-shot Head Avatars](https://github.com/neeek2303/EMOPortraits)
+
+[RT-GENE: Real-Time Eye Gaze Estimation in Natural Environments](https://github.com/Tobias-Fischer/rt_gene?tab=readme-ov-file)
+
+===== POSSIBLE ENTRYPOINTS =====
+vendor/ghost2/inference.py
+vendor/ghost2/preprocess_image.py
+vendor/ghost2/src/losses/rt_gene_loss_fb/build_rtgene_dataset.py
+vendor/ghost2/train_aligner.py
+vendor/ghost2/train_blender.py

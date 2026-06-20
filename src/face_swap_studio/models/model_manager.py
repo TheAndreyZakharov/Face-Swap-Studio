@@ -8,9 +8,14 @@ import insightface
 import onnxruntime as ort
 from insightface.app import FaceAnalysis
 
+from src.face_swap_studio.models.manifest import (
+    is_model_ready,
+    model_definitions,
+)
 from src.face_swap_studio.utils.logging import get_logger
 from src.face_swap_studio.utils.paths import (
     enhancer_directory,
+    load_settings,
     swapper_directory,
     upscaler_directory,
 )
@@ -23,45 +28,81 @@ def available_onnx_providers() -> list[str]:
 
 
 def preferred_onnx_providers() -> list[str]:
-    available = set(available_onnx_providers())
-    providers: list[str] = []
+    runtime = load_settings().get("runtime", {})
+    configured = runtime.get(
+        "preferred_onnx_providers",
+        [
+            "CoreMLExecutionProvider",
+            "CPUExecutionProvider",
+        ],
+    )
 
-    if "CoreMLExecutionProvider" in available:
-        providers.append("CoreMLExecutionProvider")
+    available = set(available_onnx_providers())
+    providers = [
+        provider
+        for provider in configured
+        if provider in available
+    ]
 
     if "CPUExecutionProvider" in available:
-        providers.append("CPUExecutionProvider")
+        if "CPUExecutionProvider" not in providers:
+            providers.append("CPUExecutionProvider")
 
     if not providers:
-        raise RuntimeError("ONNX Runtime не обнаружил подходящих execution providers.")
+        raise RuntimeError(
+            "ONNX Runtime не обнаружил подходящих execution providers."
+        )
 
     return providers
 
 
 @lru_cache(maxsize=1)
 def get_face_analyser() -> FaceAnalysis:
+    settings = load_settings()
+    detection = settings.get("detection", {})
+
+    model_name = str(detection.get("model", "buffalo_l"))
+    input_size = int(detection.get("input_size", 640))
+
     providers = preferred_onnx_providers()
-    logger.info("Загрузка FaceAnalysis с providers: %s", providers)
+
+    logger.info(
+        "Загрузка FaceAnalysis %s с providers=%s",
+        model_name,
+        providers,
+    )
 
     analyser = FaceAnalysis(
-        name="buffalo_l",
+        name=model_name,
         root=str(Path.home() / ".insightface"),
         providers=providers,
     )
-    analyser.prepare(ctx_id=0, det_size=(640, 640))
+    analyser.prepare(
+        ctx_id=0,
+        det_size=(input_size, input_size),
+    )
 
     return analyser
 
 
 @lru_cache(maxsize=4)
-def get_face_swapper(model_name: str = "inswapper_128.onnx") -> Any:
+def get_face_swapper(
+    model_name: str = "inswapper_128.onnx",
+) -> Any:
     model_path = swapper_directory() / model_name
 
     if not model_path.is_file():
-        raise FileNotFoundError(f"Не найдена модель замены лица: {model_path}")
+        raise FileNotFoundError(
+            f"Не найдена модель замены лица: {model_path}"
+        )
 
     providers = preferred_onnx_providers()
-    logger.info("Загрузка swap-модели %s с providers: %s", model_name, providers)
+
+    logger.info(
+        "Загрузка swap-модели %s с providers=%s",
+        model_path.name,
+        providers,
+    )
 
     return insightface.model_zoo.get_model(
         str(model_path),
@@ -73,7 +114,9 @@ def gfpgan_model_path() -> Path:
     path = enhancer_directory() / "GFPGANv1.4.pth"
 
     if not path.is_file():
-        raise FileNotFoundError(f"Не найдена модель GFPGAN: {path}")
+        raise FileNotFoundError(
+            f"Не найдена модель GFPGAN: {path}"
+        )
 
     return path
 
@@ -82,18 +125,15 @@ def realesrgan_model_path() -> Path:
     path = upscaler_directory() / "RealESRGAN_x4plus.pth"
 
     if not path.is_file():
-        raise FileNotFoundError(f"Не найдена модель Real-ESRGAN: {path}")
+        raise FileNotFoundError(
+            f"Не найдена модель Real-ESRGAN: {path}"
+        )
 
     return path
 
 
 def model_status() -> dict[str, bool]:
-    buffalo = Path.home() / ".insightface" / "models" / "buffalo_l"
-
     return {
-        "buffalo_l_detector": (buffalo / "det_10g.onnx").is_file(),
-        "buffalo_l_recognition": (buffalo / "w600k_r50.onnx").is_file(),
-        "inswapper_128": (swapper_directory() / "inswapper_128.onnx").is_file(),
-        "gfpgan_v1_4": gfpgan_model_path().is_file(),
-        "realesrgan_x4plus": realesrgan_model_path().is_file(),
+        definition.id: is_model_ready(definition)
+        for definition in model_definitions()
     }

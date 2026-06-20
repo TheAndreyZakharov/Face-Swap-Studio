@@ -1,0 +1,3 @@
+cd /Users/andrey/Documents/projects/Face-Swap-Studio && source .venv/bin/activate && python scripts/check_environment.py && python scripts/check_external_models.py && python scripts/verify_external_assets.py && python -m ruff check app.py src tests scripts && python -m compileall -q app.py src tests scripts && python -m pytest -v && python -m pip check
+
+./scripts/run.sh

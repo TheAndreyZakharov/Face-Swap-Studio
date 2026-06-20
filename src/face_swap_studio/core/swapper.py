@@ -4,28 +4,37 @@ from typing import Any
 
 import numpy as np
 
-from src.face_swap_studio.models.model_manager import get_face_swapper
+from src.face_swap_studio.models.model_manager import (
+    get_face_swapper,
+)
 
-SUPPORTED_SWAPPERS = {
-    "InSwapper 128": "inswapper_128.onnx",
-}
+INSWAPPER_MODEL_FILE = "inswapper_128.onnx"
 
 
 def swap_face(
     image_bgr: np.ndarray,
     source_face: Any,
     target_face: Any,
-    model_label: str = "InSwapper 128",
 ) -> np.ndarray:
-    if model_label not in SUPPORTED_SWAPPERS:
-        raise ValueError(f"Неизвестная swap-модель: {model_label}")
+    if image_bgr is None or image_bgr.size == 0:
+        raise ValueError("Передано пустое изображение.")
 
-    model_name = SUPPORTED_SWAPPERS[model_label]
-    swapper = get_face_swapper(model_name)
+    if source_face is None:
+        raise ValueError("Не передано исходное лицо.")
 
-    return swapper.get(
+    if target_face is None:
+        raise ValueError("Не передано целевое лицо.")
+
+    swapper = get_face_swapper(INSWAPPER_MODEL_FILE)
+
+    result = swapper.get(
         image_bgr,
         target_face,
         source_face,
         paste_back=True,
     )
+
+    if result is None:
+        raise RuntimeError("InSwapper не вернул результат.")
+
+    return result

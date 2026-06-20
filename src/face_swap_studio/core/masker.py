@@ -12,15 +12,29 @@ def feather_mask(
     if width <= 0 or height <= 0:
         raise ValueError("Размер маски должен быть положительным.")
 
-    mask = np.zeros((height, width), dtype=np.float32)
+    normalized_ratio = float(np.clip(feather_ratio, 0.0, 0.49))
 
-    margin_x = max(1, int(width * feather_ratio))
-    margin_y = max(1, int(height * feather_ratio))
+    mask = np.zeros(
+        (height, width),
+        dtype=np.float32,
+    )
+
+    margin_x = max(
+        1,
+        int(width * normalized_ratio),
+    )
+    margin_y = max(
+        1,
+        int(height * normalized_ratio),
+    )
 
     cv2.ellipse(
         mask,
         center=(width // 2, height // 2),
-        axes=(max(1, width // 2 - margin_x), max(1, height // 2 - margin_y)),
+        axes=(
+            max(1, width // 2 - margin_x),
+            max(1, height // 2 - margin_y),
+        ),
         angle=0,
         startAngle=0,
         endAngle=360,
@@ -28,10 +42,19 @@ def feather_mask(
         thickness=-1,
     )
 
-    blur_size = max(3, int(min(width, height) * feather_ratio))
-    blur_size = blur_size if blur_size % 2 == 1 else blur_size + 1
+    blur_size = max(
+        3,
+        int(min(width, height) * normalized_ratio),
+    )
 
-    return cv2.GaussianBlur(mask, (blur_size, blur_size), 0)
+    if blur_size % 2 == 0:
+        blur_size += 1
+
+    return cv2.GaussianBlur(
+        mask,
+        (blur_size, blur_size),
+        0,
+    )
 
 
 def alpha_blend(
@@ -42,11 +65,30 @@ def alpha_blend(
     if background.shape != foreground.shape:
         raise ValueError("Фон и foreground должны иметь одинаковый размер.")
 
-    if mask.ndim == 2:
-        mask = mask[..., None]
+    if background.ndim != 3:
+        raise ValueError("Ожидается цветное изображение формата H×W×C.")
 
-    mask = np.clip(mask.astype(np.float32), 0.0, 1.0)
+    if mask.shape[:2] != background.shape[:2]:
+        raise ValueError("Размер маски не совпадает с размером изображений.")
 
-    result = foreground.astype(np.float32) * mask + background.astype(np.float32) * (1.0 - mask)
+    normalized_mask = mask.astype(np.float32)
 
-    return np.clip(result, 0, 255).astype(np.uint8)
+    if normalized_mask.ndim == 2:
+        normalized_mask = normalized_mask[..., None]
+
+    normalized_mask = np.clip(
+        normalized_mask,
+        0.0,
+        1.0,
+    )
+
+    background_float = background.astype(np.float32)
+    foreground_float = foreground.astype(np.float32)
+
+    result = foreground_float * normalized_mask + background_float * (1.0 - normalized_mask)
+
+    return np.clip(
+        result,
+        0,
+        255,
+    ).astype(np.uint8)
