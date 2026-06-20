@@ -1,26 +1,38 @@
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(PROJECT_ROOT))
 
-CHECKS = {
-    "SimSwap repository": ROOT / "vendor" / "simswap",
-    "SimSwap 512 archive": ROOT / "models" / "swappers" / "simswap512" / "512.zip",
-    "GHOST repository": ROOT / "vendor" / "ghost",
-    "GHOST 2.0 repository": ROOT / "vendor" / "ghost2",
-    "GHOST 2.0 aligner directory": ROOT / "vendor" / "ghost2" / "aligner_checkpoints",
-    "GHOST 2.0 blender directory": ROOT / "vendor" / "ghost2" / "blender_checkpoints",
-    "SimSwap environment": ROOT / ".environments" / "simswap",
-    "GHOST environment": ROOT / ".environments" / "ghost",
-    "GHOST 2.0 environment": ROOT / ".environments" / "ghost2",
-}
+from src.face_swap_studio.models.manifest import available_models  # noqa: E402
 
-failed = False
 
-for name, path in CHECKS.items():
-    exists = path.exists()
-    print(f"[{'OK' if exists else 'MISSING'}] {name}: {path}")
-    failed = failed or not exists
+def main() -> int:
+    failed = False
 
-raise SystemExit(1 if failed else 0)
+    for model in available_models():
+        print()
+        print(f"{model.label} [{model.key}]")
+        print(f"  Тип: {model.kind}")
+        print(f"  Backend: {model.backend}")
+
+        missing = model.missing_paths()
+
+        if not missing:
+            print("  Статус: READY")
+            continue
+
+        failed = True
+        print("  Статус: INCOMPLETE")
+        print("  Отсутствуют:")
+
+        for path in missing:
+            print(f"    - {path}")
+
+    return 1 if failed else 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
