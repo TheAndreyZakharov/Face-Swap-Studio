@@ -34,6 +34,44 @@ class Model:
 
 
 MODELS: dict[str, Model] = {
+    "hyperswap-1a-256": Model(
+        name="HyperSwap 1A 256",
+        category="swappers",
+        filename="hyperswap_1a_256.onnx",
+        url=(
+            "https://huggingface.co/facefusion/"
+            "models-3.3.0/resolve/main/"
+            "hyperswap_1a_256.onnx"
+        ),
+        sha256=(
+            "c0e98a8a03a238f461ed3d2570e426b"
+            "49f46745ee400854a60dceeb70c246add"
+        ),
+    ),
+    "hyperswap-1b-256": Model(
+        name="HyperSwap 1B 256",
+        category="swappers",
+        filename="hyperswap_1b_256.onnx",
+        url=(
+            "https://huggingface.co/facefusion/"
+            "models-3.3.0/resolve/main/"
+            "hyperswap_1b_256.onnx"
+        ),
+        sha256=(
+            "5124031789c42f71b9558fb71954ef7a"
+            "edb6da7ed9fac79293e23c61a792a73e"
+        ),
+    ),
+    "uniface-256": Model(
+        name="UniFace 256",
+        category="swappers",
+        filename="uniface_256.onnx",
+        url=(
+            "https://huggingface.co/facefusion/"
+            "models-3.0.0/resolve/main/"
+            "uniface_256.onnx"
+        ),
+    ),
     "gfpgan-v1.4": Model(
         name="GFPGAN v1.4",
         category="enhancers",

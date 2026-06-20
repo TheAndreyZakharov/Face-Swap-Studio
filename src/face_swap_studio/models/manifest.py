@@ -62,6 +62,54 @@ def model_definitions() -> tuple[ModelDefinition, ...]:
             supports_face_assignments=True,
         ),
         ModelDefinition(
+            id="hyperswap_1a_256",
+            name="HyperSwap 1A 256",
+            description=(
+                "ONNX face-swap model with a 256×256 working crop. "
+                "Focused on identity preservation and facial detail."
+            ),
+            kind=ModelKind.FACE_SWAP,
+            backend=BackendKind.INTERNAL,
+            required_paths=(
+                swapper_directory()
+                / "hyperswap_1a_256.onnx",
+            ),
+            supports_multiple_faces=True,
+            supports_face_assignments=True,
+        ),
+        ModelDefinition(
+            id="hyperswap_1b_256",
+            name="HyperSwap 1B 256",
+            description=(
+                "Alternative HyperSwap 256 variant for comparing "
+                "identity similarity, shape and texture."
+            ),
+            kind=ModelKind.FACE_SWAP,
+            backend=BackendKind.INTERNAL,
+            required_paths=(
+                swapper_directory()
+                / "hyperswap_1b_256.onnx",
+            ),
+            supports_multiple_faces=True,
+            supports_face_assignments=True,
+        ),
+        ModelDefinition(
+            id="uniface_256",
+            name="UniFace 256",
+            description=(
+                "ONNX face-swap model using aligned source and target "
+                "face images at 256×256 resolution."
+            ),
+            kind=ModelKind.FACE_SWAP,
+            backend=BackendKind.INTERNAL,
+            required_paths=(
+                swapper_directory()
+                / "uniface_256.onnx",
+            ),
+            supports_multiple_faces=True,
+            supports_face_assignments=True,
+        ),
+        ModelDefinition(
             id="simswap_512",
             name="SimSwap 512 Beta",
             description=(
