@@ -50,8 +50,8 @@ def model_definitions() -> tuple[ModelDefinition, ...]:
             id="inswapper_128",
             name="InSwapper 128",
             description=(
-                "Быстрая локальная ONNX-модель. Поддерживает выбор "
-                "конкретного target-лица."
+                "High-resolution 512 face-swap model. Useful for "
+                "detail comparison, but uses an external runtime."
             ),
             kind=ModelKind.FACE_SWAP,
             backend=BackendKind.INTERNAL,
@@ -113,8 +113,8 @@ def model_definitions() -> tuple[ModelDefinition, ...]:
             id="simswap_512",
             name="SimSwap 512 Beta",
             description=(
-                "Высокодетализированная модель с рабочим разрешением "
-                "лица 512×512."
+                "High-resolution 512 face-swap model. Useful for "
+                "detail comparison, but uses an external runtime."
             ),
             kind=ModelKind.FACE_SWAP,
             backend=BackendKind.EXTERNAL,
@@ -157,7 +157,8 @@ def model_definitions() -> tuple[ModelDefinition, ...]:
             id="ghost_unet_1block",
             name="GHOST U-Net 1 Block",
             description=(
-                "Самый лёгкий вариант GHOST. Требует меньше памяти."
+                "Lightweight GHOST U-Net variant. Lower memory usage "
+                "and faster external processing."
             ),
             kind=ModelKind.FACE_SWAP,
             backend=BackendKind.EXTERNAL,
@@ -188,7 +189,8 @@ def model_definitions() -> tuple[ModelDefinition, ...]:
             id="ghost_unet_2blocks",
             name="GHOST U-Net 2 Blocks",
             description=(
-                "Сбалансированный вариант GHOST по качеству и памяти."
+                "Balanced GHOST U-Net variant for quality and memory "
+                "usage."
             ),
             kind=ModelKind.FACE_SWAP,
             backend=BackendKind.EXTERNAL,
@@ -219,7 +221,8 @@ def model_definitions() -> tuple[ModelDefinition, ...]:
             id="ghost_unet_3blocks",
             name="GHOST U-Net 3 Blocks",
             description=(
-                "Самый тяжёлый из установленных вариантов GHOST."
+                "Heaviest installed GHOST U-Net variant. Best suited "
+                "for quality comparison."
             ),
             kind=ModelKind.FACE_SWAP,
             backend=BackendKind.EXTERNAL,
@@ -250,7 +253,8 @@ def model_definitions() -> tuple[ModelDefinition, ...]:
             id="ghost2_head",
             name="GHOST 2.0 Head Swap",
             description=(
-                "Полная замена головы. Самая тяжёлая модель в проекте."
+                "Full head-swap model. Heavy external pipeline for "
+                "head replacement experiments."
             ),
             kind=ModelKind.HEAD_SWAP,
             backend=BackendKind.EXTERNAL,
@@ -299,7 +303,7 @@ def model_definitions() -> tuple[ModelDefinition, ...]:
         ModelDefinition(
             id="gfpgan_v1_4",
             name="GFPGAN v1.4",
-            description="Восстановление и улучшение областей лица.",
+            description="Face restoration and enhancement.",
             kind=ModelKind.FACE_ENHANCEMENT,
             backend=BackendKind.INTERNAL,
             required_paths=(
@@ -309,7 +313,7 @@ def model_definitions() -> tuple[ModelDefinition, ...]:
         ModelDefinition(
             id="realesrgan_x4plus",
             name="Real-ESRGAN x4plus",
-            description="Улучшение и увеличение всего изображения.",
+            description="Full-image upscaling and enhancement.",
             kind=ModelKind.IMAGE_UPSCALING,
             backend=BackendKind.INTERNAL,
             required_paths=(

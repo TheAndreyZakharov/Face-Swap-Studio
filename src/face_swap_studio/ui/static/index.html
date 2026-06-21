@@ -63,6 +63,21 @@
                 </div>
 
                 <button
+                    id="theme-toggle-button"
+                    class="theme-toggle"
+                    type="button"
+                    aria-label="Toggle theme"
+                >
+                    <span class="theme-toggle-track">
+                        <span class="theme-toggle-knob"></span>
+                    </span>
+
+                    <span id="theme-toggle-label">
+                        Dark
+                    </span>
+                </button>
+
+                <button
                     id="reset-session-button"
                     class="button button-ghost"
                     type="button"
@@ -73,94 +88,49 @@
         </header>
 
         <main class="workspace">
-            <aside class="workflow-sidebar">
-                <div class="sidebar-heading">
-                    <span class="eyebrow">
-                        Workflow
-                    </span>
-
-                    <h2>
-                        Build a replacement
-                    </h2>
-
-                    <p>
-                        Add images, detect faces, define mappings
-                        and generate the result.
-                    </p>
-                </div>
-
-                <nav class="workflow-navigation">
+            <section class="workflow-strip">
+                <div class="workflow-strip-steps">
                     <button
-                        class="workflow-step is-active"
+                        class="workflow-pill"
                         data-scroll-target="upload-section"
                         type="button"
                     >
-                        <span class="workflow-step-number">
-                            01
-                        </span>
-
-                        <span>
-                            <strong>Add images</strong>
-                            <small>Source and target files</small>
-                        </span>
+                        <span>01</span>
+                        Images
                     </button>
 
                     <button
-                        class="workflow-step"
+                        class="workflow-pill"
                         data-scroll-target="faces-section"
                         type="button"
                     >
-                        <span class="workflow-step-number">
-                            02
-                        </span>
-
-                        <span>
-                            <strong>Detect faces</strong>
-                            <small>Review detected identities</small>
-                        </span>
+                        <span>02</span>
+                        Detection
                     </button>
 
                     <button
-                        class="workflow-step"
+                        class="workflow-pill"
                         data-scroll-target="mapping-section"
                         type="button"
                     >
-                        <span class="workflow-step-number">
-                            03
-                        </span>
-
-                        <span>
-                            <strong>Map replacements</strong>
-                            <small>Choose what changes</small>
-                        </span>
+                        <span>03</span>
+                        Mapping
                     </button>
 
                     <button
-                        class="workflow-step"
+                        class="workflow-pill"
                         data-scroll-target="generation-section"
                         type="button"
                     >
-                        <span class="workflow-step-number">
-                            04
-                        </span>
-
-                        <span>
-                            <strong>Generate</strong>
-                            <small>Model and final output</small>
-                        </span>
+                        <span>04</span>
+                        Generate
                     </button>
-                </nav>
-
-                <div class="sidebar-status">
-                    <span class="sidebar-status-label">
-                        Status
-                    </span>
-
-                    <p id="status-message">
-                        Preparing application.
-                    </p>
                 </div>
-            </aside>
+
+                <p id="status-message">
+                    Preparing application.
+                </p>
+            </section>
 
             <div class="content-column">
                 <section
@@ -178,9 +148,10 @@
                             </h2>
 
                             <p>
-                                Add identities and target photographs
-                                independently. New files can be added
-                                at any time.
+                                Add source identities and one or more
+                                target photos. Mark target photos for
+                                batch generation and click a target
+                                thumbnail to edit its mappings.
                             </p>
                         </div>
                     </div>
@@ -192,10 +163,8 @@
                                     <h3>
                                         Source identities
                                     </h3>
-
                                     <p>
-                                        Faces that may be inserted into
-                                        the target image.
+                                        
                                     </p>
                                 </div>
 
@@ -249,10 +218,8 @@
                                     <h3>
                                         Target images
                                     </h3>
-
                                     <p>
-                                        Select the image whose faces
-                                        should be replaced.
+                                         
                                     </p>
                                 </div>
 
@@ -289,6 +256,24 @@
                                     Click or drag files here
                                 </span>
                             </label>
+
+                            <div class="target-selection-actions">
+                                <button
+                                    id="target-select-all-button"
+                                    class="target-selection-button"
+                                    type="button"
+                                >
+                                    Select all
+                                </button>
+
+                                <button
+                                    id="target-clear-selection-button"
+                                    class="target-selection-button"
+                                    type="button"
+                                >
+                                    Clear selection
+                                </button>
+                            </div>
 
                             <div
                                 id="target-image-list"
@@ -331,7 +316,7 @@
                             class="button button-primary"
                             type="button"
                         >
-                            Detect faces
+                            Detect active target
                         </button>
                     </div>
                 </section>
@@ -349,11 +334,10 @@
                             <h2>
                                 Detected faces
                             </h2>
-
                             <p>
-                                Open a thumbnail for a larger preview.
-                                Detection is performed for the selected
-                                target image.
+                                Source faces are detected from all source
+                                images. Target faces are grouped by target
+                                image after detection.
                             </p>
                         </div>
                     </div>
@@ -435,11 +419,10 @@
                             <h2>
                                 Define replacements
                             </h2>
-
                             <p>
-                                Choose a source identity for every
-                                detected target face, or leave the face
-                                unchanged.
+                                Mappings are grouped by selected target
+                                image. Choose source faces visually for
+                                each detected target face.
                             </p>
                         </div>
 
@@ -451,11 +434,16 @@
                             Clear mappings
                         </button>
                     </div>
+                    <div
+                        id="mapping-quick-source-list"
+                        class="mapping-quick-source-list"
+                    ></div>
 
                     <div
                         id="mapping-list"
                         class="mapping-list"
                     >
+
                         <div class="empty-state empty-state-wide">
                             <strong>
                                 No mappings available
@@ -482,6 +470,11 @@
                                 <h2>
                                     Model and processing
                                 </h2>
+
+                                <p>
+                                    One model is applied to every checked
+                                    target image during generation.
+                                </p>
                             </div>
                         </div>
 
@@ -646,7 +639,7 @@
                             class="button button-primary generate-button"
                             type="button"
                         >
-                            Generate image
+                            Generate selected targets
                         </button>
                     </div>
 
@@ -658,8 +651,13 @@
                                 </span>
 
                                 <h2>
-                                    Generated image
+                                    Generated images
                                 </h2>
+
+                                <p>
+                                    Batch results appear here after
+                                    generation.
+                                </p>
                             </div>
 
                             <a
@@ -668,15 +666,17 @@
                                 href="#"
                                 download
                             >
-                                Download
+                                Download active
                             </a>
                         </div>
 
-                        <button
+
+                        <div
                             id="result-preview"
                             class="result-preview"
-                            type="button"
-                            disabled
+                            role="button"
+                            tabindex="0"
+                            aria-disabled="true"
                         >
                             <div
                                 id="result-placeholder"
@@ -691,8 +691,8 @@
                                 </strong>
 
                                 <span>
-                                    Configure mappings and generate an
-                                    image.
+                                    Configure mappings and generate
+                                    selected targets.
                                 </span>
                             </div>
 
@@ -701,7 +701,40 @@
                                 alt="Generated result"
                                 hidden
                             >
-                        </button>
+                        </div>
+
+                        <div class="result-carousel-controls">
+                            <button
+                                id="result-previous-button"
+                                class="result-carousel-button"
+                                type="button"
+                                hidden
+                                aria-label="Previous result"
+                            >
+                                Previous
+                            </button>
+
+                            <span
+                                id="result-counter"
+                                class="result-counter"
+                                hidden
+                            ></span>
+
+                            <button
+                                id="result-next-button"
+                                class="result-carousel-button"
+                                type="button"
+                                hidden
+                                aria-label="Next result"
+                            >
+                                Next
+                            </button>
+                        </div>
+
+                        <div
+                            id="generated-result-list"
+                            class="generated-result-list"
+                        ></div>
                     </div>
                 </section>
             </div>

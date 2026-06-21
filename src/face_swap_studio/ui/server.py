@@ -4,9 +4,10 @@ import asyncio
 import mimetypes
 import shutil
 import uuid
+import zipfile
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Any
+from typing import Annotated, Any
 
 import cv2
 import numpy as np
@@ -40,16 +41,20 @@ from src.face_swap_studio.ui.api_models import (
     DetectionRequest,
     FaceMappingRequest,
     FaceResponse,
+    GeneratedResultResponse,
     GenerationRequest,
     ModelResponse,
     SessionCreateResponse,
     SessionResponse,
+    TargetAnalysisResponse,
+    TargetBatchSelectionRequest,
     TargetSelectionRequest,
     UploadedImageResponse,
 )
 from src.face_swap_studio.ui.session import (
     DetectedFace,
     StudioSession,
+    TargetAnalysis,
     UploadedImage,
     session_store,
 )
@@ -551,15 +556,15 @@ def save_target_detected_faces(
 
 def create_target_working_copy(
     session: StudioSession,
-    source_path: Path,
+    target_image: UploadedImage,
 ) -> Path:
     destination = (
         session.results_directory
-        / "working-target.png"
+        / f"working-target-{target_image.id[:12]}.png"
     )
 
     image = read_image(
-        source_path
+        target_image.path
     )
 
     return write_image(
@@ -873,6 +878,7 @@ def uploaded_image_response(
     image: UploadedImage,
     *,
     selected: bool,
+    included: bool,
 ) -> UploadedImageResponse:
     return UploadedImageResponse(
         id=image.id,
@@ -882,6 +888,7 @@ def uploaded_image_response(
             image.path,
         ),
         selected=selected,
+        included=included,
     )
 
 
@@ -900,24 +907,119 @@ def detected_face_response(
     )
 
 
+def generated_result_response(
+    session: StudioSession,
+    target_image: UploadedImage,
+    result_path: Path,
+) -> GeneratedResultResponse:
+    return GeneratedResultResponse(
+        target_image_id=target_image.id,
+        target_image_name=target_image.name,
+        url=session_file_url(
+            session,
+            result_path,
+        ),
+        download_url=(
+            f"/api/sessions/{session.id}/download/"
+            f"{target_image.id}"
+        ),
+    )
+
+def target_analysis_response(
+    session: StudioSession,
+    target_image: UploadedImage,
+) -> TargetAnalysisResponse:
+    analysis = session.target_analyses.get(
+        target_image.id
+    )
+
+    if analysis is None:
+        return TargetAnalysisResponse(
+            target_image_id=target_image.id,
+            target_image_name=target_image.name,
+            analysis_completed=False,
+            target_faces=[],
+            mappings={},
+        )
+
+    return TargetAnalysisResponse(
+        target_image_id=target_image.id,
+        target_image_name=target_image.name,
+        analysis_completed=analysis.analysis_completed,
+        target_faces=[
+            detected_face_response(
+                session,
+                face,
+            )
+            for face in analysis.target_faces
+        ],
+        mappings=dict(
+            analysis.face_mappings
+        ),
+    )
+
 def build_session_response(
     session: StudioSession,
 ) -> SessionResponse:
+    active_analysis = session.active_target_analysis()
+
+    target_faces = (
+        active_analysis.target_faces
+        if active_analysis is not None
+        else []
+    )
+
+    mappings = (
+        active_analysis.face_mappings
+        if active_analysis is not None
+        else {}
+    )
+
+    generated_results: list[GeneratedResultResponse] = []
+
+    for target_image in session.target_images:
+        result_path = session.result_paths.get(
+            target_image.id
+        )
+
+        if (
+            result_path is not None
+            and result_path.is_file()
+        ):
+            generated_results.append(
+                generated_result_response(
+                    session,
+                    target_image,
+                    result_path,
+                )
+            )
+
     result_url: str | None = None
     download_url: str | None = None
 
+    active_result = (
+        session.result_paths.get(
+            session.active_target_image_id
+        )
+        if session.active_target_image_id is not None
+        else None
+    )
+
     if (
-        session.result_path is not None
-        and session.result_path.is_file()
+        active_result is not None
+        and active_result.is_file()
     ):
         result_url = session_file_url(
             session,
-            session.result_path,
+            active_result,
         )
 
         download_url = (
             f"/api/sessions/{session.id}/download"
         )
+    elif generated_results:
+        result_url = generated_results[0].url
+        download_url = generated_results[0].download_url
 
     return SessionResponse(
         session_id=session.id,
@@ -926,6 +1028,7 @@ def build_session_response(
                 session,
                 image,
                 selected=False,
+                included=False,
             )
             for image in session.source_images
         ],
@@ -936,6 +1039,10 @@ def build_session_response(
                 selected=(
                     image.id
                     == session.active_target_image_id
+                ),
+                included=(
+                    image.id
+                    in session.selected_target_image_ids
                 ),
             )
             for image in session.target_images
@@ -952,19 +1059,35 @@ def build_session_response(
                 session,
                 face,
             )
-            for face in session.target_faces
+            for face in target_faces
         ],
         mappings=dict(
-            session.face_mappings
+            mappings
         ),
         active_target_image_id=(
             session.active_target_image_id
         ),
+        selected_target_image_ids=[
+            image.id
+            for image in session.target_images
+            if image.id in session.selected_target_image_ids
+        ],
+        target_analyses=[
+            target_analysis_response(
+                session,
+                image,
+            )
+            for image in session.target_images
+        ],
         analysis_completed=(
-            session.analysis_completed
+            bool(
+                active_analysis
+                and active_analysis.analysis_completed
+            )
         ),
         result_url=result_url,
         download_url=download_url,
+        generated_results=generated_results,
     )
 
 
@@ -988,14 +1111,40 @@ def resolve_model(
         f"Unknown model: {model_id}"
     )
 
+def safe_download_stem(
+    name: str,
+) -> str:
+    stem = Path(
+        name
+    ).stem
+
+    safe_stem = "".join(
+        character
+        if (
+            character.isalnum()
+            or character in {
+                "-",
+                "_",
+            }
+        )
+        else "_"
+        for character in stem
+    ).strip(
+        "_"
+    )
+
+    if not safe_stem:
+        safe_stem = "face-swap-result"
+
+    return safe_stem
 
 def copy_result_to_session(
     session: StudioSession,
+    target_image: UploadedImage,
     source_path: Path,
 ) -> Path:
-    destination = (
-        session.results_directory
-        / "generated-result.png"
+    destination = session.result_path_for(
+        target_image.id
     )
 
     source = source_path.expanduser().resolve()
@@ -1020,27 +1169,32 @@ def copy_result_to_session(
             "Could not create the session result file."
         )
 
+    session.result_paths[
+        target_image.id
+    ] = destination
+
     return destination
 
 
-def run_generation(
+def target_images_for_generation(
     session: StudioSession,
+) -> list[UploadedImage]:
+    return [
+        image
+        for image in session.target_images
+        if image.id in session.selected_target_image_ids
+    ]
+
+
+def run_generation_for_target(
+    session: StudioSession,
+    target_image: UploadedImage,
+    analysis: TargetAnalysis,
     request: GenerationRequest,
 ) -> Path:
-    resolve_model(
-        request.model_id
-    )
-
-    active_target = session.active_target_image()
-
-    if active_target is None:
+    if not analysis.analysis_completed:
         raise ValueError(
-            "Select a target image first."
-        )
-
-    if not session.analysis_completed:
-        raise ValueError(
-            "Detect faces before generating."
+            f"Detect faces for target image first: {target_image.name}"
         )
 
     active_mappings = [
@@ -1050,19 +1204,19 @@ def run_generation(
         )
         for target_index, source_index
         in sorted(
-            session.face_mappings.items()
+            analysis.face_mappings.items()
         )
         if source_index is not None
     ]
 
     if not active_mappings:
         raise ValueError(
-            "Assign at least one replacement."
+            f"Assign at least one replacement for: {target_image.name}"
         )
 
     working_target_path = create_target_working_copy(
         session,
-        active_target.path,
+        target_image,
     )
 
     processing_options = ProcessingOptions(
@@ -1079,6 +1233,7 @@ def run_generation(
     crop_directory = (
         session.results_directory
         / "face-crops"
+        / target_image.id
     )
 
     shutil.rmtree(
@@ -1109,7 +1264,7 @@ def run_generation(
         matching_target_face = next(
             (
                 face
-                for face in session.target_faces
+                for face in analysis.target_faces
                 if face.index
                 == target_face_index
             ),
@@ -1118,16 +1273,14 @@ def run_generation(
 
         if matching_target_face is None:
             raise ValueError(
-                f"Target face "
-                f"{target_face_index + 1} "
-                "is no longer available."
+                f"Target face {target_face_index + 1} "
+                f"is no longer available for: {target_image.name}"
             )
 
         if matching_target_face.crop_box is None:
             raise ValueError(
-                f"Target face "
-                f"{target_face_index + 1} "
-                "does not have crop coordinates."
+                f"Target face {target_face_index + 1} "
+                f"does not have crop coordinates for: {target_image.name}"
             )
 
         source_face = session.source_faces[
@@ -1185,10 +1338,141 @@ def run_generation(
 
     return copy_result_to_session(
         session,
+        target_image,
         Path(
             working_target_path
         ),
     )
+
+def generated_result_items(
+    session: StudioSession,
+) -> list[tuple[UploadedImage, Path]]:
+    items: list[tuple[UploadedImage, Path]] = []
+
+    for target_image in session.target_images:
+        result_path = session.result_paths.get(
+            target_image.id
+        )
+
+        if (
+            result_path is not None
+            and result_path.is_file()
+        ):
+            items.append(
+                (
+                    target_image,
+                    result_path,
+                )
+            )
+
+    return items
+
+
+def build_results_archive(
+    session: StudioSession,
+    items: list[tuple[UploadedImage, Path]],
+) -> Path:
+    archive_path = (
+        session.results_directory
+        / "face-swap-results.zip"
+    )
+
+    archive_path.unlink(
+        missing_ok=True
+    )
+
+    used_names: set[str] = set()
+
+    with zipfile.ZipFile(
+        archive_path,
+        mode="w",
+        compression=zipfile.ZIP_DEFLATED,
+    ) as archive:
+        for index, (
+            target_image,
+            result_path,
+        ) in enumerate(
+            items,
+            start=1,
+        ):
+            base_name = safe_download_stem(
+                target_image.name
+            )
+
+            archive_name = (
+                f"{index:02d}-{base_name}-face-swap.png"
+            )
+
+            if archive_name in used_names:
+                archive_name = (
+                    f"{index:02d}-{base_name}-"
+                    f"{target_image.id[:8]}-face-swap.png"
+                )
+
+            used_names.add(
+                archive_name
+            )
+
+            archive.write(
+                result_path,
+                arcname=archive_name,
+            )
+
+    if (
+        not archive_path.is_file()
+        or archive_path.stat().st_size == 0
+    ):
+        raise RuntimeError(
+            "Could not create results archive."
+        )
+
+    return archive_path
+
+
+def run_generation(
+    session: StudioSession,
+    request: GenerationRequest,
+) -> dict[str, Path]:
+    resolve_model(
+        request.model_id
+    )
+
+    if not session.source_faces:
+        raise ValueError(
+            "Detect source faces before generating."
+        )
+
+    targets = target_images_for_generation(
+        session
+    )
+
+    if not targets:
+        raise ValueError(
+            "Select at least one target image with the green border."
+        )
+
+    generated: dict[str, Path] = {}
+
+    for target_image in targets:
+        analysis = session.target_analyses.get(
+            target_image.id
+        )
+
+        if analysis is None:
+            raise ValueError(
+                f"Detect faces for target image first: {target_image.name}"
+            )
+
+        generated[
+            target_image.id
+        ] = run_generation_for_target(
+            session,
+            target_image,
+            analysis,
+            request,
+        )
+
+    return generated
 
 
 @asynccontextmanager
@@ -1280,7 +1564,10 @@ def create_application() -> FastAPI:
     )
     async def upload_sources(
         session_id: str,
-        files: list[UploadFile] = File(...),
+        files: Annotated[
+            list[UploadFile],
+            File(),
+        ],
     ) -> SessionResponse:
         session = require_session(
             session_id
@@ -1308,13 +1595,40 @@ def create_application() -> FastAPI:
             session
         )
 
+    @application.delete(
+        "/api/sessions/{session_id}/sources/{source_image_id}",
+        response_model=SessionResponse,
+    )
+    async def delete_source_image(
+        session_id: str,
+        source_image_id: str,
+    ) -> SessionResponse:
+        session = require_session(
+            session_id
+        )
+
+        if not session.remove_source_image(
+            source_image_id
+        ):
+            raise HTTPException(
+                status_code=404,
+                detail="Source image not found.",
+            )
+
+        return build_session_response(
+            session
+        )
+
     @application.post(
         "/api/sessions/{session_id}/targets",
         response_model=SessionResponse,
     )
     async def upload_targets(
         session_id: str,
-        files: list[UploadFile] = File(...),
+        files: Annotated[
+            list[UploadFile],
+            File(),
+        ],
     ) -> SessionResponse:
         session = require_session(
             session_id
@@ -1339,7 +1653,29 @@ def create_application() -> FastAPI:
             if session.active_target_image_id is None:
                 session.active_target_image_id = image.id
 
-        session.reset_analysis()
+        return build_session_response(
+            session
+        )
+
+    @application.delete(
+        "/api/sessions/{session_id}/targets/{target_image_id}",
+        response_model=SessionResponse,
+    )
+    async def delete_target_image(
+        session_id: str,
+        target_image_id: str,
+    ) -> SessionResponse:
+        session = require_session(
+            session_id
+        )
+
+        if not session.remove_target_image(
+            target_image_id
+        ):
+            raise HTTPException(
+                status_code=404,
+                detail="Target image not found.",
+            )
 
         return build_session_response(
             session
@@ -1357,14 +1693,8 @@ def create_application() -> FastAPI:
             session_id
         )
 
-        matching_image = next(
-            (
-                image
-                for image in session.target_images
-                if image.id
-                == request.target_image_id
-            ),
-            None,
+        matching_image = session.target_image_by_id(
+            request.target_image_id
         )
 
         if matching_image is None:
@@ -1377,7 +1707,47 @@ def create_application() -> FastAPI:
             matching_image.id
         )
 
-        session.reset_analysis()
+        return build_session_response(
+            session
+        )
+
+    @application.put(
+        "/api/sessions/{session_id}/target-batch-selection",
+        response_model=SessionResponse,
+    )
+    async def update_target_batch_selection(
+        session_id: str,
+        request: TargetBatchSelectionRequest,
+    ) -> SessionResponse:
+        session = require_session(
+            session_id
+        )
+
+        valid_ids = {
+            image.id
+            for image in session.target_images
+        }
+
+        requested_ids = set(
+            request.target_image_ids
+        )
+
+        invalid_ids = requested_ids - valid_ids
+
+        if invalid_ids:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "Invalid target image id(s): "
+                    + ", ".join(
+                        sorted(
+                            invalid_ids
+                        )
+                    )
+                ),
+            )
+
+        session.selected_target_image_ids = requested_ids
 
         return build_session_response(
             session
@@ -1401,13 +1771,30 @@ def create_application() -> FastAPI:
                 detail="Add at least one source image.",
             )
 
-        active_target = session.active_target_image()
+        selected_target_ids = [
+            image.id
+            for image in session.target_images
+            if image.id in session.selected_target_image_ids
+        ]
 
-        if active_target is None:
-            raise HTTPException(
-                status_code=400,
-                detail="Add and select a target image.",
-            )
+        if selected_target_ids:
+            target_images = [
+                image
+                for image in session.target_images
+                if image.id in selected_target_ids
+            ]
+        else:
+            active_target = session.active_target_image()
+
+            if active_target is None:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Add and select a target image.",
+                )
+
+            target_images = [
+                active_target,
+            ]
 
         try:
             source_gallery = await asyncio.to_thread(
@@ -1434,25 +1821,91 @@ def create_application() -> FastAPI:
                 prefix="source",
             )
 
-            session.target_faces = await asyncio.to_thread(
-                save_target_detected_faces,
-                active_target.path,
-                session.target_faces_directory,
-                request.confidence_threshold,
-            )
+            detected_target_count = 0
+            failed_targets: list[str] = []
 
-            if not session.target_faces:
+            for target_image in target_images:
+                analysis = session.ensure_target_analysis(
+                    target_image.id
+                )
+
+                target_faces = await asyncio.to_thread(
+                    save_target_detected_faces,
+                    target_image.path,
+                    session.target_faces_directory_for(
+                        target_image.id
+                    ),
+                    request.confidence_threshold,
+                )
+
+                if not target_faces:
+                    analysis.target_faces = []
+                    analysis.face_mappings = {}
+                    analysis.analysis_completed = False
+
+                    session.result_paths.pop(
+                        target_image.id,
+                        None,
+                    )
+
+                    failed_targets.append(
+                        target_image.name
+                    )
+
+                    continue
+
+                previous_mappings = dict(
+                    analysis.face_mappings
+                )
+
+                analysis.target_faces = target_faces
+
+                analysis.face_mappings = {
+                    face.index: previous_mappings.get(
+                        face.index
+                    )
+                    for face in analysis.target_faces
+                }
+
+                analysis.analysis_completed = True
+
+                session.result_paths.pop(
+                    target_image.id,
+                    None,
+                )
+
+                detected_target_count += 1
+
+            if detected_target_count == 0:
+                if failed_targets:
+                    raise ValueError(
+                        "No target faces were detected in selected target images."
+                    )
+
                 raise ValueError(
                     "No target faces were detected."
                 )
 
-            session.face_mappings = {
-                face.index: None
-                for face in session.target_faces
-            }
+            if session.active_target_image_id is None:
+                session.active_target_image_id = (
+                    target_images[0].id
+                )
 
-            session.analysis_completed = True
-            session.result_path = None
+            if (
+                session.active_target_image_id
+                not in {
+                    image.id
+                    for image in target_images
+                }
+            ):
+                session.active_target_image_id = (
+                    target_images[0].id
+                )
+
+            for target_image in target_images:
+                session.selected_target_image_ids.add(
+                    target_image.id
+                )
 
             return build_session_response(
                 session
@@ -1483,7 +1936,35 @@ def create_application() -> FastAPI:
             session_id
         )
 
-        if not session.analysis_completed:
+        target_image_id = (
+            request.target_image_id
+            or session.active_target_image_id
+        )
+
+        if target_image_id is None:
+            raise HTTPException(
+                status_code=400,
+                detail="Select a target image first.",
+            )
+
+        active_target = session.target_image_by_id(
+            target_image_id
+        )
+
+        if active_target is None:
+            raise HTTPException(
+                status_code=404,
+                detail="Target image not found.",
+            )
+
+        analysis = session.target_analyses.get(
+            target_image_id
+        )
+
+        if (
+            analysis is None
+            or not analysis.analysis_completed
+        ):
             raise HTTPException(
                 status_code=400,
                 detail="Detect faces first.",
@@ -1494,7 +1975,7 @@ def create_application() -> FastAPI:
             int | None,
         ] = {
             face.index: None
-            for face in session.target_faces
+            for face in analysis.target_faces
         }
 
         for mapping in request.mappings:
@@ -1533,8 +2014,12 @@ def create_application() -> FastAPI:
                 mapping.target_face_index
             ] = mapping.source_face_index
 
-        session.face_mappings = updated_mappings
-        session.result_path = None
+        analysis.face_mappings = updated_mappings
+
+        session.result_paths.pop(
+            active_target.id,
+            None,
+        )
 
         return build_session_response(
             session
@@ -1553,7 +2038,7 @@ def create_application() -> FastAPI:
         )
 
         try:
-            session.result_path = await asyncio.to_thread(
+            await asyncio.to_thread(
                 run_generation,
                 session,
                 request,
@@ -1621,6 +2106,57 @@ def create_application() -> FastAPI:
             media_type=media_type,
         )
 
+    @application.delete(
+        "/api/sessions/{session_id}/results/{target_image_id}",
+        response_model=SessionResponse,
+    )
+    async def delete_target_result(
+        session_id: str,
+        target_image_id: str,
+    ) -> SessionResponse:
+        session = require_session(
+            session_id
+        )
+
+        target_image = session.target_image_by_id(
+            target_image_id
+        )
+
+        if target_image is None:
+            raise HTTPException(
+                status_code=404,
+                detail="Target image not found.",
+            )
+
+        result_path = session.result_paths.pop(
+            target_image_id,
+            None,
+        )
+
+        if result_path is not None:
+            result_path.unlink(
+                missing_ok=True
+            )
+
+        if (
+            session.active_target_image_id
+            == target_image_id
+        ):
+            remaining_result_ids = [
+                image.id
+                for image in session.target_images
+                if image.id in session.result_paths
+            ]
+
+            if remaining_result_ids:
+                session.active_target_image_id = (
+                    remaining_result_ids[0]
+                )
+
+        return build_session_response(
+            session
+        )
+    
     @application.get(
         "/api/sessions/{session_id}/download",
         include_in_schema=False,
@@ -1632,9 +2168,72 @@ def create_application() -> FastAPI:
             session_id
         )
 
+        items = generated_result_items(
+            session
+        )
+
+        if not items:
+            raise HTTPException(
+                status_code=404,
+                detail=(
+                    "No generated result is available."
+                ),
+            )
+
+        if len(
+            items
+        ) == 1:
+            target_image, result_path = items[0]
+
+            return FileResponse(
+                result_path,
+                media_type="image/png",
+                filename=(
+                    f"{safe_download_stem(target_image.name)}"
+                    "-face-swap.png"
+                ),
+            )
+
+        archive_path = build_results_archive(
+            session,
+            items,
+        )
+
+        return FileResponse(
+            archive_path,
+            media_type="application/zip",
+            filename="face-swap-results.zip",
+        )
+
+    @application.get(
+        "/api/sessions/{session_id}/download/{target_image_id}",
+        include_in_schema=False,
+    )
+    async def download_target_result(
+        session_id: str,
+        target_image_id: str,
+    ) -> FileResponse:
+        session = require_session(
+            session_id
+        )
+
+        target_image = session.target_image_by_id(
+            target_image_id
+        )
+
+        if target_image is None:
+            raise HTTPException(
+                status_code=404,
+                detail="Target image not found.",
+            )
+
+        result_path = session.result_paths.get(
+            target_image_id
+        )
+
         if (
-            session.result_path is None
-            or not session.result_path.is_file()
+            result_path is None
+            or not result_path.is_file()
         ):
             raise HTTPException(
                 status_code=404,
@@ -1644,9 +2243,11 @@ def create_application() -> FastAPI:
             )
 
         return FileResponse(
-            session.result_path,
+            result_path,
             media_type="image/png",
-            filename="face-swap-result.png",
+            filename=(
+                f"{Path(target_image.name).stem}-face-swap.png"
+            ),
         )
 
     @application.delete(

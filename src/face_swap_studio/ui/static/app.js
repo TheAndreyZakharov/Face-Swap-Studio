@@ -5,6 +5,8 @@ const state = {
     session: null,
     models: [],
     busy: false,
+    theme: "dark",
+    resultIndex: 0,
 };
 
 const elements = {};
@@ -16,9 +18,10 @@ document.addEventListener(
 
 
 async function initializeApplication() {
+    applySavedTheme();
     collectElements();
     bindEvents();
-
+    updateThemeToggle();
     updateRangeOutputs();
 
     try {
@@ -39,6 +42,8 @@ function collectElements() {
     const ids = [
         "connection-status",
         "reset-session-button",
+        "theme-toggle-button",
+        "theme-toggle-label",
         "status-message",
 
         "source-input",
@@ -50,6 +55,8 @@ function collectElements() {
         "target-count",
         "source-image-list",
         "target-image-list",
+        "target-select-all-button",
+        "target-clear-selection-button",
 
         "confidence-input",
         "confidence-output",
@@ -61,6 +68,7 @@ function collectElements() {
         "target-face-grid",
 
         "mapping-list",
+        "mapping-quick-source-list",
         "clear-mappings-button",
 
         "model-select",
@@ -80,7 +88,11 @@ function collectElements() {
         "result-preview",
         "result-placeholder",
         "result-image",
+        "result-previous-button",
+        "result-next-button",
+        "result-counter",
         "download-button",
+        "generated-result-list",
 
         "loading-overlay",
         "loading-title",
@@ -139,6 +151,16 @@ function bindEvents() {
         ),
     );
 
+    elements["target-select-all-button"].addEventListener(
+        "click",
+        selectAllTargetImages,
+    );
+
+    elements["target-clear-selection-button"].addEventListener(
+        "click",
+        clearTargetImageSelection,
+    );
+
     elements["confidence-input"].addEventListener(
         "input",
         updateRangeOutputs,
@@ -174,6 +196,11 @@ function bindEvents() {
         resetSession,
     );
 
+    elements["theme-toggle-button"].addEventListener(
+        "click",
+        toggleTheme,
+    );
+
     elements["result-preview"].addEventListener(
         "click",
         () => {
@@ -185,6 +212,28 @@ function bindEvents() {
                     "Generated result",
                 );
             }
+        },
+    );
+
+    elements["result-previous-button"].addEventListener(
+        "click",
+        event => {
+            event.stopPropagation();
+
+            moveResultPreview(
+                -1,
+            );
+        },
+    );
+
+    elements["result-next-button"].addEventListener(
+        "click",
+        event => {
+            event.stopPropagation();
+
+            moveResultPreview(
+                1,
+            );
         },
     );
 
@@ -235,6 +284,61 @@ function bindEvents() {
                 },
             );
         });
+}
+
+
+function applySavedTheme() {
+    const savedTheme = localStorage.getItem(
+        "face-swap-studio-theme",
+    );
+
+    state.theme = (
+        savedTheme === "light"
+            ? "light"
+            : "dark"
+    );
+
+    document.documentElement.dataset.theme = (
+        state.theme
+    );
+}
+
+
+function toggleTheme() {
+    state.theme = (
+        state.theme === "dark"
+            ? "light"
+            : "dark"
+    );
+
+    document.documentElement.dataset.theme = (
+        state.theme
+    );
+
+    localStorage.setItem(
+        "face-swap-studio-theme",
+        state.theme,
+    );
+
+    updateThemeToggle();
+}
+
+
+function updateThemeToggle() {
+    if (!elements["theme-toggle-button"]) {
+        return;
+    }
+
+    elements["theme-toggle-button"].classList.toggle(
+        "is-light",
+        state.theme === "light",
+    );
+
+    elements["theme-toggle-label"].textContent = (
+        state.theme === "light"
+            ? "Light"
+            : "Dark"
+    );
 }
 
 
@@ -476,7 +580,7 @@ async function uploadImages(
 
             setStatus(
                 kind === "sources"
-                    ? "Source images added."
+                    ? "Source images added. Run detection again."
                     : "Target images added.",
             );
         },
@@ -490,6 +594,47 @@ async function uploadImages(
 }
 
 
+async function deleteUploadedImage(
+    kind,
+    imageId,
+) {
+    if (
+        state.busy
+        || !state.session
+    ) {
+        return;
+    }
+
+    await runBusyOperation(
+        kind === "sources"
+            ? "Removing source image"
+            : "Removing target image",
+        "Updating the current session.",
+        async () => {
+            state.session = await apiRequest(
+                (
+                    `/api/sessions/`
+                    + `${state.sessionId}/`
+                    + `${kind}/`
+                    + imageId
+                ),
+                {
+                    method: "DELETE",
+                },
+            );
+
+            renderSession();
+
+            setStatus(
+                kind === "sources"
+                    ? "Source image removed. Detection was reset."
+                    : "Target image removed.",
+            );
+        },
+    );
+}
+
+
 async function selectTargetImage(
     targetImageId,
 ) {
@@ -499,7 +644,7 @@ async function selectTargetImage(
 
     await runBusyOperation(
         "Selecting target image",
-        "Resetting previous face detection.",
+        "Loading target-specific detection and mappings.",
         async () => {
             state.session = await apiRequest(
                 (
@@ -522,10 +667,162 @@ async function selectTargetImage(
 
             renderSession();
 
+            if (state.session.analysis_completed) {
+                setStatus(
+                    "Target image selected. Existing mappings loaded.",
+                );
+            } else {
+                setStatus(
+                    "Target image selected. Run face detection for this target.",
+                );
+            }
+        },
+    );
+}
+
+async function toggleTargetImageSelection(
+    targetImageId,
+) {
+    if (
+        state.busy
+        || !state.session
+    ) {
+        return;
+    }
+
+    const selectedIds = new Set(
+        state.session.selected_target_image_ids
+        || [],
+    );
+
+    const shouldInclude = !selectedIds.has(
+        targetImageId
+    );
+
+    if (shouldInclude) {
+        selectedIds.add(
+            targetImageId
+        );
+    } else {
+        selectedIds.delete(
+            targetImageId
+        );
+    }
+
+    await updateTargetSelectionSet(
+        Array.from(
+            selectedIds,
+        ),
+        targetImageId,
+        shouldInclude
+            ? "Target image added for generation."
+            : "Target image removed from generation.",
+    );
+}
+
+async function updateTargetSelectionSet(
+    targetImageIds,
+    activeTargetImageId,
+    statusMessage,
+) {
+    if (
+        state.busy
+        || !state.session
+    ) {
+        return;
+    }
+
+    await runBusyOperation(
+        "Updating target selection",
+        "Changing target images selected for generation.",
+        async () => {
+            if (activeTargetImageId) {
+                await apiRequest(
+                    (
+                        `/api/sessions/`
+                        + `${state.sessionId}/`
+                        + "target-selection"
+                    ),
+                    {
+                        method: "POST",
+                        headers: {
+                            "Content-Type":
+                                "application/json",
+                        },
+                        body: JSON.stringify({
+                            target_image_id:
+                                activeTargetImageId,
+                        }),
+                    },
+                );
+            }
+
+            state.session = await apiRequest(
+                (
+                    `/api/sessions/`
+                    + `${state.sessionId}/`
+                    + "target-batch-selection"
+                ),
+                {
+                    method: "PUT",
+                    headers: {
+                        "Content-Type":
+                            "application/json",
+                    },
+                    body: JSON.stringify({
+                        target_image_ids:
+                            targetImageIds,
+                    }),
+                },
+            );
+
+            renderSession();
+
             setStatus(
-                "Target image selected. Run face detection.",
+                statusMessage,
             );
         },
+    );
+}
+
+
+async function selectAllTargetImages() {
+    if (
+        state.busy
+        || !state.session
+    ) {
+        return;
+    }
+
+    const targetIds = state.session.target_images.map(
+        image => image.id,
+    );
+
+    if (targetIds.length === 0) {
+        return;
+    }
+
+    await updateTargetSelectionSet(
+        targetIds,
+        state.session.active_target_image_id
+        || targetIds[0],
+        "All target images selected for generation.",
+    );
+}
+
+
+async function clearTargetImageSelection() {
+    if (
+        state.busy
+        || !state.session
+    ) {
+        return;
+    }
+
+    await updateTargetSelectionSet(
+        [],
+        state.session.active_target_image_id,
+        "Target generation selection cleared.",
     );
 }
 
@@ -537,7 +834,7 @@ async function detectFaces() {
 
     await runBusyOperation(
         "Detecting faces",
-        "Analysing source identities and the selected target image.",
+        "Analysing source identities and selected target images.",
         async () => {
             state.session = await apiRequest(
                 (
@@ -563,12 +860,27 @@ async function detectFaces() {
 
             renderSession();
 
+            const detectedTargetCount = (
+                state.session.target_analyses
+                || []
+            ).reduce(
+                (total, analysis) => (
+                    total
+                    + (
+                        analysis.analysis_completed
+                            ? analysis.target_faces.length
+                            : 0
+                    )
+                ),
+                0,
+            );
+
             setStatus(
                 (
-                    "Detection complete. "
+                    "Detection complete for selected targets. "
                     + `${state.session.source_faces.length} `
                     + "source face(s), "
-                    + `${state.session.target_faces.length} `
+                    + `${detectedTargetCount} `
                     + "target face(s)."
                 ),
             );
@@ -587,6 +899,7 @@ async function detectFaces() {
 
 
 async function updateMapping(
+    targetImageId,
     targetFaceIndex,
     sourceFaceIndex,
 ) {
@@ -597,17 +910,31 @@ async function updateMapping(
         return;
     }
 
+    const analysis = findTargetAnalysis(
+        targetImageId,
+    );
+
+    if (!analysis) {
+        return;
+    }
+
     const mappings = {
-        ...state.session.mappings,
+        ...analysis.mappings,
     };
 
     mappings[
         String(
             targetFaceIndex,
         )
-    ] = sourceFaceIndex;
+    ] = (
+        sourceFaceIndex === undefined
+            ? null
+            : sourceFaceIndex
+    );
 
     const payload = {
+        target_image_id:
+            targetImageId,
         mappings: Object.entries(
             mappings,
         ).map(
@@ -619,6 +946,8 @@ async function updateMapping(
                     Number(targetIndex),
                 source_face_index:
                     sourceIndex === null
+                    || sourceIndex === undefined
+                    || sourceIndex === ""
                         ? null
                         : Number(sourceIndex),
             }),
@@ -648,6 +977,7 @@ async function updateMapping(
 
         setStatus(
             sourceFaceIndex === null
+            || sourceFaceIndex === undefined
                 ? (
                     `Target face `
                     + `${targetFaceIndex + 1} `
@@ -662,22 +992,245 @@ async function updateMapping(
         );
     } catch (error) {
         handleError(error);
-        renderMappings();
+        await refreshSession();
     }
 }
 
+async function applySourceFaceToAllSelectedTargets(
+    sourceFaceIndex,
+) {
+    if (
+        state.busy
+        || !state.session
+    ) {
+        return;
+    }
+
+    const targetIds = selectedTargetIdsForMappings();
+
+    const readyAnalyses = targetIds
+        .map(targetImageId => findTargetAnalysis(
+            targetImageId,
+        ))
+        .filter(analysis => (
+            analysis
+            && analysis.analysis_completed
+            && analysis.target_faces.length > 0
+        ));
+
+    if (readyAnalyses.length === 0) {
+        showToast(
+            "Run detection for selected targets first.",
+            true,
+        );
+
+        return;
+    }
+
+    await runBusyOperation(
+        "Applying source face",
+        "Assigning one source face to every detected target face.",
+        async () => {
+            for (const analysis of readyAnalyses) {
+                const payload = {
+                    target_image_id:
+                        analysis.target_image_id,
+                    mappings:
+                        analysis.target_faces.map(
+                            face => ({
+                                target_face_index:
+                                    face.index,
+                                source_face_index:
+                                    sourceFaceIndex,
+                            }),
+                        ),
+                };
+
+                state.session = await apiRequest(
+                    (
+                        `/api/sessions/`
+                        + `${state.sessionId}/mappings`
+                    ),
+                    {
+                        method: "PUT",
+                        headers: {
+                            "Content-Type":
+                                "application/json",
+                        },
+                        body: JSON.stringify(
+                            payload,
+                        ),
+                    },
+                );
+            }
+
+            renderSession();
+
+            setStatus(
+                (
+                    `Source face ${sourceFaceIndex + 1} `
+                    + "was applied to every detected face "
+                    + "in selected targets."
+                ),
+            );
+        },
+    );
+}
+
+
+function renderMappingQuickActions() {
+    const container = elements[
+        "mapping-quick-source-list"
+    ];
+
+    container.replaceChildren();
+
+    if (
+        !state.session
+        || state.session.source_faces.length === 0
+    ) {
+        const empty = document.createElement(
+            "div",
+        );
+
+        empty.className = (
+            "mapping-quick-empty"
+        );
+
+        empty.textContent = (
+            "Detect source faces to enable quick assignment."
+        );
+
+        container.append(
+            empty,
+        );
+
+        return;
+    }
+
+    const header = document.createElement(
+        "div",
+    );
+
+    header.className = (
+        "mapping-quick-header"
+    );
+
+    const title = document.createElement(
+        "strong",
+    );
+
+    title.textContent = (
+        "Apply one source to all target faces"
+    );
+
+    const subtitle = document.createElement(
+        "span",
+    );
+
+    subtitle.textContent = (
+        "Click a source face below to assign it to every detected face in selected targets."
+    );
+
+    header.append(
+        title,
+        subtitle,
+    );
+
+    const grid = document.createElement(
+        "div",
+    );
+
+    grid.className = (
+        "mapping-quick-source-grid"
+    );
+
+    for (
+        const sourceFace
+        of state.session.source_faces
+    ) {
+        const button = document.createElement(
+            "button",
+        );
+
+        button.type = "button";
+        button.className = (
+            "mapping-quick-source-button"
+        );
+
+        const image = document.createElement(
+            "img",
+        );
+
+        image.src = sourceFace.image_url;
+        image.alt = sourceFace.label;
+        image.loading = "lazy";
+
+        const label = document.createElement(
+            "span",
+        );
+
+        label.textContent = (
+            `Source ${sourceFace.index + 1}`
+        );
+
+        button.append(
+            image,
+            label,
+        );
+
+        button.addEventListener(
+            "click",
+            () => {
+                applySourceFaceToAllSelectedTargets(
+                    sourceFace.index,
+                );
+            },
+        );
+
+        grid.append(
+            button,
+        );
+    }
+
+    container.append(
+        header,
+        grid,
+    );
+}
 
 async function clearMappings() {
     if (
-        !state.session
-        || !state.session.analysis_completed
+        state.busy
+        || !state.session
+    ) {
+        return;
+    }
+
+    const activeTargetId = (
+        state.session.active_target_image_id
+    );
+
+    if (!activeTargetId) {
+        return;
+    }
+
+    const analysis = findTargetAnalysis(
+        activeTargetId,
+    );
+
+    if (
+        !analysis
+        || !analysis.analysis_completed
     ) {
         return;
     }
 
     const payload = {
+        target_image_id:
+            activeTargetId,
         mappings:
-            state.session.target_faces.map(
+            analysis.target_faces.map(
                 face => ({
                     target_face_index:
                         face.index,
@@ -709,10 +1262,11 @@ async function clearMappings() {
         renderResult();
 
         setStatus(
-            "All target faces will remain unchanged.",
+            "All target faces for the active target will remain unchanged.",
         );
     } catch (error) {
         handleError(error);
+        await refreshSession();
     }
 }
 
@@ -736,8 +1290,8 @@ async function generateImage() {
     }
 
     await runBusyOperation(
-        "Generating image",
-        "The selected model is processing the configured replacements.",
+        "Generating selected targets",
+        "The selected model is processing every checked target image.",
         async () => {
             state.session = await apiRequest(
                 (
@@ -786,7 +1340,11 @@ async function generateImage() {
             renderSession();
 
             setStatus(
-                "Generation complete.",
+                (
+                    "Generation complete. "
+                    + `${state.session.generated_results.length} `
+                    + "result image(s) available."
+                ),
             );
 
             document
@@ -809,7 +1367,7 @@ async function resetSession() {
 
     await runBusyOperation(
         "Clearing session",
-        "Removing temporary images and mappings.",
+        "Removing temporary images, mappings and generated results.",
         async () => {
             if (state.sessionId) {
                 try {
@@ -843,6 +1401,7 @@ async function resetSession() {
 function renderSession() {
     renderUploadedImages();
     renderDetectedFaces();
+    renderMappingQuickActions();
     renderMappings();
     renderResult();
 }
@@ -868,13 +1427,13 @@ function renderUploadedImages() {
     renderUploadedImageList(
         elements["source-image-list"],
         state.session.source_images,
-        false,
+        "sources",
     );
 
     renderUploadedImageList(
         elements["target-image-list"],
         state.session.target_images,
-        true,
+        "targets",
     );
 }
 
@@ -882,14 +1441,14 @@ function renderUploadedImages() {
 function renderUploadedImageList(
     container,
     images,
-    selectable,
+    kind,
 ) {
     container.replaceChildren();
 
     if (images.length === 0) {
         container.append(
             createEmptyInline(
-                selectable
+                kind === "targets"
                     ? "No target images"
                     : "No source images",
             ),
@@ -899,18 +1458,26 @@ function renderUploadedImageList(
     }
 
     for (const image of images) {
-        const button = document.createElement(
+        const card = document.createElement(
+            "article",
+        );
+
+        card.className = "upload-thumbnail";
+
+        if (image.included) {
+            card.classList.add(
+                "is-included",
+            );
+        }
+
+        const previewButton = document.createElement(
             "button",
         );
 
-        button.type = "button";
-        button.className = "upload-thumbnail";
-
-        if (image.selected) {
-            button.classList.add(
-                "is-selected",
-            );
-        }
+        previewButton.type = "button";
+        previewButton.className = (
+            "upload-thumbnail-preview"
+        );
 
         const preview = document.createElement(
             "img",
@@ -930,14 +1497,16 @@ function renderUploadedImageList(
 
         label.textContent = image.name;
 
-        button.append(
+        previewButton.append(
             preview,
             label,
         );
 
-        button.addEventListener(
+        previewButton.addEventListener(
             "dblclick",
-            () => {
+            event => {
+                event.stopPropagation();
+
                 openImageDialog(
                     image.url,
                     image.name,
@@ -945,24 +1514,91 @@ function renderUploadedImageList(
             },
         );
 
-        button.addEventListener(
+        previewButton.addEventListener(
             "click",
-            () => {
-                if (selectable) {
-                    selectTargetImage(
-                        image.id,
-                    );
-                } else {
-                    openImageDialog(
-                        image.url,
-                        image.name,
-                    );
-                }
+            event => {
+                event.stopPropagation();
+
+                openImageDialog(
+                    image.url,
+                    image.name,
+                );
             },
         );
 
+        const removeButton = document.createElement(
+            "button",
+        );
+
+        removeButton.type = "button";
+        removeButton.className = (
+            "upload-thumbnail-remove"
+        );
+
+        removeButton.setAttribute(
+            "aria-label",
+            `Remove ${image.name}`,
+        );
+
+        removeButton.textContent = "×";
+
+        removeButton.addEventListener(
+            "click",
+            event => {
+                event.stopPropagation();
+
+                deleteUploadedImage(
+                    kind,
+                    image.id,
+                );
+            },
+        );
+
+        card.append(
+            previewButton,
+            removeButton,
+        );
+
+        if (kind === "targets") {
+            const selectionButton = document.createElement(
+                "button",
+            );
+
+            selectionButton.type = "button";
+            selectionButton.className = (
+                "target-toggle-button"
+            );
+
+            if (image.included) {
+                selectionButton.classList.add(
+                    "is-included",
+                );
+            }
+
+            selectionButton.textContent = (
+                image.included
+                    ? "Remove from generation"
+                    : "Add for generation"
+            );
+
+            selectionButton.addEventListener(
+                "click",
+                event => {
+                    event.stopPropagation();
+
+                    toggleTargetImageSelection(
+                        image.id,
+                    );
+                },
+            );
+
+            card.append(
+                selectionButton,
+            );
+        }
+
         container.append(
-            button,
+            card,
         );
     }
 }
@@ -979,10 +1615,25 @@ function renderDetectedFaces() {
         state.session.source_faces.length,
     );
 
+    const detectedTargetCount = (
+        state.session.target_analyses
+        || []
+    ).reduce(
+        (total, analysis) => (
+            total
+            + (
+                analysis.analysis_completed
+                    ? analysis.target_faces.length
+                    : 0
+            )
+        ),
+        0,
+    );
+
     elements[
         "target-face-count"
     ].textContent = String(
-        state.session.target_faces.length,
+        detectedTargetCount,
     );
 
     renderFaceGrid(
@@ -991,11 +1642,7 @@ function renderDetectedFaces() {
         "No source faces",
     );
 
-    renderFaceGrid(
-        elements["target-face-grid"],
-        state.session.target_faces,
-        "No target faces",
-    );
+    renderTargetFaceGroups();
 }
 
 
@@ -1061,21 +1708,187 @@ function renderFaceGrid(
     }
 }
 
+function renderTargetFaceGroups() {
+    const container = elements["target-face-grid"];
+
+    container.replaceChildren();
+
+    if (!state.session) {
+        return;
+    }
+
+    const analyses = (
+        state.session.target_analyses
+        || []
+    ).filter(
+        analysis => (
+            analysis.analysis_completed
+            && analysis.target_faces.length > 0
+        ),
+    );
+
+    if (analyses.length === 0) {
+        container.append(
+            createEmptyState(
+                "No target faces",
+                "Select target images and run detection.",
+            ),
+        );
+
+        return;
+    }
+
+    for (const analysis of analyses) {
+        const group = document.createElement(
+            "section",
+        );
+
+        group.className = "target-face-group";
+
+        const heading = document.createElement(
+            "div",
+        );
+
+        heading.className = "target-face-group-heading";
+
+        const title = document.createElement(
+            "strong",
+        );
+
+        title.textContent = analysis.target_image_name;
+
+        const count = document.createElement(
+            "span",
+        );
+
+        count.textContent = (
+            `${analysis.target_faces.length} face(s)`
+        );
+
+        heading.append(
+            title,
+            count,
+        );
+
+        const grid = document.createElement(
+            "div",
+        );
+
+        grid.className = "target-face-group-grid";
+
+        for (const face of analysis.target_faces) {
+            const button = document.createElement(
+                "button",
+            );
+
+            button.type = "button";
+            button.className = "face-card";
+
+            const image = document.createElement(
+                "img",
+            );
+
+            image.src = face.image_url;
+            image.alt = face.label;
+            image.loading = "lazy";
+
+            const label = document.createElement(
+                "span",
+            );
+
+            label.className = "face-card-label";
+            label.textContent = face.label;
+
+            button.append(
+                image,
+                label,
+            );
+
+            button.addEventListener(
+                "click",
+                () => {
+                    openImageDialog(
+                        face.image_url,
+                        `${analysis.target_image_name} · ${face.label}`,
+                    );
+                },
+            );
+
+            grid.append(
+                button,
+            );
+        }
+
+        group.append(
+            heading,
+            grid,
+        );
+
+        container.append(
+            group,
+        );
+    }
+}
+
+function findTargetImage(
+    targetImageId,
+) {
+    if (!state.session) {
+        return null;
+    }
+
+    return (
+        state.session.target_images.find(
+            image => image.id === targetImageId,
+        )
+        || null
+    );
+}
+
+
+function findTargetAnalysis(
+    targetImageId,
+) {
+    if (!state.session) {
+        return null;
+    }
+
+    return (
+        (
+            state.session.target_analyses
+            || []
+        ).find(
+            analysis => (
+                analysis.target_image_id
+                === targetImageId
+            ),
+        )
+        || null
+    );
+}
+
+
+function selectedTargetIdsForMappings() {
+    if (!state.session) {
+        return [];
+    }
+
+    return (
+        state.session.selected_target_image_ids
+        || []
+    );
+}
 
 function renderMappings() {
     const container = elements["mapping-list"];
 
     container.replaceChildren();
 
-    if (
-        !state.session
-        || !state.session.analysis_completed
-        || state.session.target_faces.length === 0
-    ) {
+    if (!state.session) {
         container.append(
             createEmptyState(
                 "No mappings available",
-                "Detect faces to configure replacements.",
+                "Add target images first.",
                 true,
             ),
         );
@@ -1083,194 +1896,337 @@ function renderMappings() {
         return;
     }
 
-    for (
-        const targetFace
-        of state.session.target_faces
-    ) {
-        const row = document.createElement(
+    const targetIds = selectedTargetIdsForMappings();
+
+    if (targetIds.length === 0) {
+        container.append(
+            createEmptyState(
+                "No targets selected",
+                "Click a target image to add the green border and include it in generation.",
+                true,
+            ),
+        );
+
+        return;
+    }
+
+    let renderedAnySection = false;
+
+    for (const targetImageId of targetIds) {
+        const targetImage = findTargetImage(
+            targetImageId,
+        );
+
+        if (!targetImage) {
+            continue;
+        }
+
+        const analysis = findTargetAnalysis(
+            targetImageId,
+        );
+
+        const section = document.createElement(
+            "section",
+        );
+
+        section.className = "mapping-target-section";
+
+
+        const header = document.createElement(
             "div",
         );
 
-        row.className = "mapping-row";
-
-        const targetBlock = document.createElement(
-            "div",
+        header.className = (
+            "mapping-target-section-header"
         );
 
-        targetBlock.className = "mapping-target";
-
-        const targetImage = document.createElement(
+        const image = document.createElement(
             "img",
         );
 
-        targetImage.src = targetFace.image_url;
-        targetImage.alt = targetFace.label;
+        image.src = targetImage.url;
+        image.alt = targetImage.name;
 
-        targetImage.addEventListener(
-            "click",
-            () => {
-                openImageDialog(
-                    targetFace.image_url,
-                    targetFace.label,
-                );
-            },
-        );
-
-        const targetCopy = document.createElement(
+        const copy = document.createElement(
             "div",
         );
 
-        const targetTitle = document.createElement(
+        const title = document.createElement(
             "strong",
         );
 
-        targetTitle.textContent = (
-            `Target face `
-            + `${targetFace.index + 1}`
-        );
+        title.textContent = targetImage.name;
 
-        const targetCaption = document.createElement(
+        const subtitle = document.createElement(
             "span",
         );
 
-        targetCaption.textContent = (
-            "Detected target identity"
-        );
-
-        targetCopy.append(
-            targetTitle,
-            targetCaption,
-        );
-
-        targetBlock.append(
-            targetImage,
-            targetCopy,
-        );
-
-        const arrow = document.createElement(
-            "div",
-        );
-
-        arrow.className = "mapping-arrow";
-        arrow.textContent = "→";
-
-        const sourceBlock = document.createElement(
-            "div",
-        );
-
-        sourceBlock.className = (
-            "mapping-select-wrap"
-        );
-
-        const sourcePreview = document.createElement(
-            "div",
-        );
-
-        sourcePreview.className = (
-            "mapping-source-preview"
-        );
-
-        const select = document.createElement(
-            "select",
-        );
-
-        const unchangedOption = (
-            document.createElement(
-                "option",
-            )
-        );
-
-        unchangedOption.value = "";
-        unchangedOption.textContent = (
-            "Leave unchanged"
-        );
-
-        select.append(
-            unchangedOption,
-        );
-
-        for (
-            const sourceFace
-            of state.session.source_faces
-        ) {
-            const option = document.createElement(
-                "option",
-            );
-
-            option.value = String(
-                sourceFace.index,
-            );
-
-            option.textContent = (
-                `Source face `
-                + `${sourceFace.index + 1}`
-            );
-
-            select.append(
-                option,
-            );
-        }
-
-        const currentMapping = (
-            state.session.mappings[
-                String(
-                    targetFace.index,
+        subtitle.textContent = (
+            analysis
+            && analysis.analysis_completed
+                ? (
+                    `${analysis.target_faces.length} `
+                    + "target face(s) detected"
                 )
-            ]
+                : "Detection is not available for this target yet"
         );
 
-        select.value = (
-            currentMapping === null
-            || currentMapping === undefined
-                ? ""
-                : String(currentMapping)
+        copy.append(
+            title,
+            subtitle,
         );
 
-        updateMappingPreview(
-            sourcePreview,
-            currentMapping,
+
+        header.append(
+            image,
+            copy,
         );
 
-        select.addEventListener(
-            "change",
+        header.addEventListener(
+            "click",
             () => {
-                const value = select.value;
-
-                const sourceIndex = (
-                    value === ""
-                        ? null
-                        : Number(value)
-                );
-
-                updateMappingPreview(
-                    sourcePreview,
-                    sourceIndex,
-                );
-
-                updateMapping(
-                    targetFace.index,
-                    sourceIndex,
+                selectTargetImage(
+                    targetImageId,
                 );
             },
         );
 
-        sourceBlock.append(
-            sourcePreview,
-            select,
+        section.append(
+            header,
         );
 
-        row.append(
-            targetBlock,
-            arrow,
-            sourceBlock,
-        );
+        if (
+            !analysis
+            || !analysis.analysis_completed
+            || analysis.target_faces.length === 0
+        ) {
+            section.append(
+                createEmptyState(
+                    "Detection required",
+                    "Click this target image above, then run Detect active target.",
+                    true,
+                ),
+            );
+
+            container.append(
+                section,
+            );
+
+            renderedAnySection = true;
+            continue;
+        }
+
+        for (
+            const targetFace
+            of analysis.target_faces
+        ) {
+            section.append(
+                createMappingRow(
+                    targetImageId,
+                    targetFace,
+                    analysis.mappings,
+                ),
+            );
+        }
 
         container.append(
-            row,
+            section,
+        );
+
+        renderedAnySection = true;
+    }
+
+    if (!renderedAnySection) {
+        container.append(
+            createEmptyState(
+                "No mappings available",
+                "Select target images and run detection.",
+                true,
+            ),
         );
     }
 }
 
+function createMappingRow(
+    targetImageId,
+    targetFace,
+    mappings,
+) {
+    const row = document.createElement(
+        "div",
+    );
+
+    row.className = "mapping-row mapping-row-visual";
+
+    const targetBlock = document.createElement(
+        "div",
+    );
+
+    targetBlock.className = "mapping-target";
+
+    const targetImage = document.createElement(
+        "img",
+    );
+
+    targetImage.src = targetFace.image_url;
+    targetImage.alt = targetFace.label;
+
+    targetImage.addEventListener(
+        "click",
+        () => {
+            openImageDialog(
+                targetFace.image_url,
+                targetFace.label,
+            );
+        },
+    );
+
+    const targetCopy = document.createElement(
+        "div",
+    );
+
+    const targetTitle = document.createElement(
+        "strong",
+    );
+
+    targetTitle.textContent = (
+        `Target face `
+        + `${targetFace.index + 1}`
+    );
+
+    const targetCaption = document.createElement(
+        "span",
+    );
+
+    targetCaption.textContent = (
+        "Choose a source face"
+    );
+
+    targetCopy.append(
+        targetTitle,
+        targetCaption,
+    );
+
+    targetBlock.append(
+        targetImage,
+        targetCopy,
+    );
+
+    const sourcePicker = document.createElement(
+        "div",
+    );
+
+    sourcePicker.className = "source-face-picker";
+
+    const currentMapping = (
+        mappings?.[
+            String(
+                targetFace.index,
+            )
+        ]
+        ?? null
+    );
+
+    const unchangedButton = document.createElement(
+        "button",
+    );
+
+    unchangedButton.type = "button";
+    unchangedButton.className = (
+        "source-face-option source-face-option-empty"
+    );
+
+    if (
+        currentMapping === null
+        || currentMapping === undefined
+    ) {
+        unchangedButton.classList.add(
+            "is-selected",
+        );
+    }
+
+    unchangedButton.textContent = "Keep";
+
+    unchangedButton.addEventListener(
+        "click",
+        () => {
+            updateMapping(
+                targetImageId,
+                targetFace.index,
+                null,
+            );
+        },
+    );
+
+    sourcePicker.append(
+        unchangedButton,
+    );
+
+    for (
+        const sourceFace
+        of state.session.source_faces
+    ) {
+        const option = document.createElement(
+            "button",
+        );
+
+        option.type = "button";
+        option.className = "source-face-option";
+
+        if (
+            currentMapping !== null
+            && currentMapping !== undefined
+            && Number(currentMapping) === sourceFace.index
+        ) {
+            option.classList.add(
+                "is-selected",
+            );
+        }
+
+        const image = document.createElement(
+            "img",
+        );
+
+        image.src = sourceFace.image_url;
+        image.alt = sourceFace.label;
+        image.loading = "lazy";
+
+        const label = document.createElement(
+            "span",
+        );
+
+        label.textContent = (
+            `Source ${sourceFace.index + 1}`
+        );
+
+        option.append(
+            image,
+            label,
+        );
+
+        option.addEventListener(
+            "click",
+            () => {
+                updateMapping(
+                    targetImageId,
+                    targetFace.index,
+                    sourceFace.index,
+                );
+            },
+        );
+
+        sourcePicker.append(
+            option,
+        );
+    }
+
+    row.append(
+        targetBlock,
+        sourcePicker,
+    );
+
+    return row;
+}
 
 function updateMappingPreview(
     container,
@@ -1418,6 +2374,9 @@ function renderModels() {
 
     const preferredIds = [
         "inswapper_128",
+        "hyperswap_1a_256",
+        "hyperswap_1b_256",
+        "uniface_256",
         "simswap_512",
         "ghost_unet_3blocks",
         "ghost2_head",
@@ -1465,14 +2424,118 @@ function updateSelectedModelDescription() {
     );
 }
 
+async function deleteGeneratedResult(
+    targetImageId,
+) {
+    if (
+        state.busy
+        || !state.session
+    ) {
+        return;
+    }
+
+    await runBusyOperation(
+        "Removing generated result",
+        "Deleting this result from the current session.",
+        async () => {
+            state.session = await apiRequest(
+                (
+                    `/api/sessions/`
+                    + `${state.sessionId}/`
+                    + "results/"
+                    + targetImageId
+                ),
+                {
+                    method: "DELETE",
+                },
+            );
+
+            clampResultIndex();
+            renderSession();
+
+            setStatus(
+                "Generated result removed.",
+            );
+        },
+    );
+}
+
+function currentGeneratedResults() {
+    return (
+        state.session?.generated_results
+        || []
+    );
+}
+
+
+function clampResultIndex() {
+    const results = currentGeneratedResults();
+
+    if (results.length === 0) {
+        state.resultIndex = 0;
+        return;
+    }
+
+    if (state.resultIndex < 0) {
+        state.resultIndex = results.length - 1;
+    }
+
+    if (state.resultIndex >= results.length) {
+        state.resultIndex = 0;
+    }
+}
+
+
+function moveResultPreview(
+    direction,
+) {
+    const results = currentGeneratedResults();
+
+    if (results.length <= 1) {
+        return;
+    }
+
+    state.resultIndex += direction;
+
+    clampResultIndex();
+    renderResult();
+}
+
+
+function setResultPreviewByTarget(
+    targetImageId,
+) {
+    const results = currentGeneratedResults();
+
+    const index = results.findIndex(
+        result => (
+            result.target_image_id
+            === targetImageId
+        ),
+    );
+
+    if (index >= 0) {
+        state.resultIndex = index;
+        renderResult();
+    }
+}
 
 function renderResult() {
-    if (
-        state.session
-        && state.session.result_url
-    ) {
+    const generatedResults = currentGeneratedResults();
+
+    elements["generated-result-list"].replaceChildren();
+
+    if (generatedResults.length > 0) {
+        clampResultIndex();
+
+        const activeResult = (
+            generatedResults[
+                state.resultIndex
+            ]
+        );
+
         elements["result-image"].src = (
-            state.session.result_url
+            activeResult.url
             + `?v=${Date.now()}`
         );
 
@@ -1480,14 +2543,169 @@ function renderResult() {
         elements["result-placeholder"].hidden = true;
 
         elements["result-preview"].disabled = false;
+        
+        elements["result-preview"].setAttribute(
+            "aria-disabled",
+            "false",
+        );
 
         elements["download-button"].href = (
-            state.session.download_url
+            `/api/sessions/${state.sessionId}/download`
         );
 
         elements["download-button"].classList.remove(
             "is-hidden",
         );
+
+        elements["download-button"].textContent = (
+            generatedResults.length > 1
+                ? "Download archive"
+                : "Download active"
+        );
+
+        elements["result-counter"].textContent = (
+            `${state.resultIndex + 1} / ${generatedResults.length}`
+        );
+
+        elements["result-previous-button"].hidden = (
+            generatedResults.length <= 1
+        );
+
+        elements["result-next-button"].hidden = (
+            generatedResults.length <= 1
+        );
+
+        elements["result-counter"].hidden = (
+            generatedResults.length <= 1
+        );
+
+        for (const result of generatedResults) {
+            const card = document.createElement(
+                "article",
+            );
+
+            card.className = "generated-result-card";
+
+            if (
+                result.target_image_id
+                === activeResult.target_image_id
+            ) {
+                card.classList.add(
+                    "is-active",
+                );
+            }
+
+            const removeButton = document.createElement(
+                "button",
+            );
+
+            removeButton.type = "button";
+            removeButton.className = (
+                "generated-result-remove"
+            );
+
+            removeButton.setAttribute(
+                "aria-label",
+                `Remove ${result.target_image_name}`,
+            );
+
+            removeButton.textContent = "×";
+
+            removeButton.addEventListener(
+                "click",
+                event => {
+                    event.stopPropagation();
+
+                    deleteGeneratedResult(
+                        result.target_image_id,
+                    );
+                },
+            );
+
+            const imageButton = document.createElement(
+                "button",
+            );
+
+            imageButton.type = "button";
+            imageButton.className = (
+                "generated-result-preview"
+            );
+
+            const image = document.createElement(
+                "img",
+            );
+
+            image.src = (
+                result.url
+                + `?v=${Date.now()}`
+            );
+
+            image.alt = result.target_image_name;
+            image.loading = "lazy";
+
+            imageButton.append(
+                image,
+            );
+
+            imageButton.addEventListener(
+                "click",
+                () => {
+                    openImageDialog(
+                        image.src,
+                        result.target_image_name,
+                    );
+                },
+            );
+
+            const footer = document.createElement(
+                "div",
+            );
+
+            footer.className = (
+                "generated-result-footer"
+            );
+
+            const name = document.createElement(
+                "button",
+            );
+
+            name.type = "button";
+            name.textContent = (
+                result.target_image_name
+            );
+
+            name.addEventListener(
+                "click",
+                () => {
+                    setResultPreviewByTarget(
+                        result.target_image_id,
+                    );
+                },
+            );
+
+            const download = document.createElement(
+                "a",
+            );
+
+            download.href = result.download_url;
+            download.download = "";
+            download.textContent = "Download";
+
+            footer.append(
+                name,
+                download,
+            );
+
+            card.append(
+                removeButton,
+                imageButton,
+                footer,
+            );
+
+            elements["generated-result-list"].append(
+                card,
+            );
+        }
 
         return;
     }
@@ -1500,6 +2718,11 @@ function renderResult() {
     elements["result-placeholder"].hidden = false;
 
     elements["result-preview"].disabled = true;
+    
+    elements["result-preview"].setAttribute(
+        "aria-disabled",
+        "true",
+    );
 
     elements["download-button"].classList.add(
         "is-hidden",
@@ -1508,6 +2731,15 @@ function renderResult() {
     elements["download-button"].removeAttribute(
         "href",
     );
+
+    elements["download-button"].textContent = (
+        "Download active"
+    );
+    
+    elements["result-previous-button"].hidden = true;
+    elements["result-next-button"].hidden = true;
+    elements["result-counter"].hidden = true;
+    elements["result-counter"].textContent = "";
 }
 
 

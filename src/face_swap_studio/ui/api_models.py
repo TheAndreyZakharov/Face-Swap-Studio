@@ -12,6 +12,7 @@ class UploadedImageResponse(BaseModel):
     name: str
     url: str
     selected: bool = False
+    included: bool = False
 
 
 class FaceResponse(BaseModel):
@@ -28,6 +29,21 @@ class ModelResponse(BaseModel):
     available: bool
 
 
+class GeneratedResultResponse(BaseModel):
+    target_image_id: str
+    target_image_name: str
+    url: str
+    download_url: str
+
+
+class TargetAnalysisResponse(BaseModel):
+    target_image_id: str
+    target_image_name: str
+    analysis_completed: bool
+    target_faces: list[FaceResponse]
+    mappings: dict[int, int | None]
+
+
 class DetectionRequest(BaseModel):
     confidence_threshold: float = Field(
         default=0.5,
@@ -38,6 +54,10 @@ class DetectionRequest(BaseModel):
 
 class TargetSelectionRequest(BaseModel):
     target_image_id: str
+
+
+class TargetBatchSelectionRequest(BaseModel):
+    target_image_ids: list[str]
 
 
 class FaceMappingItem(BaseModel):
@@ -51,6 +71,7 @@ class FaceMappingItem(BaseModel):
 
 
 class FaceMappingRequest(BaseModel):
+    target_image_id: str | None = None
     mappings: list[FaceMappingItem]
 
 
@@ -89,7 +110,10 @@ class SessionResponse(BaseModel):
     mappings: dict[int, int | None]
 
     active_target_image_id: str | None
+    selected_target_image_ids: list[str]
+    target_analyses: list[TargetAnalysisResponse]
     analysis_completed: bool
 
     result_url: str | None
     download_url: str | None
+    generated_results: list[GeneratedResultResponse]
