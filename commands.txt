@@ -1,0 +1,56 @@
+okrujenie
+conda deactivate 2>/dev/null || true && cd /Users/andrey/Documents/projects/Face-Swap-Studio && source .venv/bin/activate
+
+exit is okrujenie
+deactivate
+
+vse tests
+cd /Users/andrey/Documents/projects/Face-Swap-Studio && source .venv/bin/activate && python scripts/check_environment.py && python scripts/check_external_models.py && python scripts/verify_external_assets.py && python -m ruff check app.py src tests scripts && python -m compileall -q app.py src tests scripts && python -m pytest -v && python -m pip check
+
+run
+./scripts/run.sh
+
+check
+lsof -ti tcp:7860 || echo "port 7860 is free"
+
+kill starts
+lsof -ti tcp:7860 | xargs kill -9 2>/dev/null || true
+
+structura compact i full
+cd /Users/andrey/Documents/projects/Face-Swap-Studio && find . \( -path './.git' -o -path './.venv' -o -path './.environments' -o -path './vendor' -o -path './.pytest_cache' -o -path './.mypy_cache' -o -path './.ruff_cache' -o -name '__pycache__' \) -prune -o -type f ! -name '*.pth' ! -name '*.pt' ! -name '*.ckpt' ! -name '*.onnx' ! -name '*.zip' -print | sort > project-structure.txt
+cd /Users/andrey/Documents/projects/Face-Swap-Studio && find . -path './.git' -prune -o -print | sort > full-repository-tree.txt
+
+sbor
+cd /Users/andrey/Documents/projects/Face-Swap-Studio && ./scripts/build_macos_app.sh
+
+zip sbora
+cd /Users/andrey/Documents/projects/Face-Swap-Studio && ditto -c -k --sequesterRsrc --keepParent "dist/Face Swap Studio.app" "dist/Face Swap Studio.zip"
+
+zip na chasti razobrat
+cd /Users/andrey/Documents/projects/Face-Swap-Studio && split -b 1500m "dist/Face Swap Studio.zip" "dist/zip-parts/Face Swap Studio.zip.part-"
+
+checksum dlya razobrannogo sozdat
+cd /Users/andrey/Documents/projects/Face-Swap-Studio && shasum -a 256 "dist/Face Swap Studio.zip" > "dist/zip-parts/Face Swap Studio.zip.sha256"
+
+zip po chastyam sobrat
+cd ~/Downloads/FaceSwapStudioRelease
+cat "Face Swap Studio.zip.part-"* > "Face Swap Studio.zip"
+
+checksum dlya sobrannogo proverit
+shasum -a 256 -c "Face Swap Studio.zip.sha256"
+
+raspakovat sobrannyi arhiv posle proverki summ
+unzip "Face Swap Studio.zip"
+
+esli nado ubrat karantin flag
+xattr -cr "Face Swap Studio.app"
+
+otkryt komandoy
+open "Face Swap Studio.app"
+
+app tyt na local
+.venv/bin/python -> python3.11
+.venv/bin/python3.11 -> /opt/homebrew/opt/python@3.11/bin/python3.11
+dlya app tam na dr mac
+brew install python@3.11
+ls -l /opt/homebrew/opt/python@3.11/bin/python3.11

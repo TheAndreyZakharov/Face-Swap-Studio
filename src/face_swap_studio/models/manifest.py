@@ -50,8 +50,8 @@ def model_definitions() -> tuple[ModelDefinition, ...]:
             id="inswapper_128",
             name="InSwapper 128",
             description=(
-                "High-resolution 512 face-swap model. Useful for "
-                "detail comparison, but uses an external runtime."
+                "Fast 128px face-swap model. Good as a stable "
+                "baseline for general face replacement."
             ),
             kind=ModelKind.FACE_SWAP,
             backend=BackendKind.INTERNAL,

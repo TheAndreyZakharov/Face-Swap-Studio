@@ -23,6 +23,9 @@ models/swappers/ghost2/*
 !models/swappers/simswap512/.gitkeep
 !models/swappers/ghost/.gitkeep
 !models/swappers/ghost2/.gitkeep
+dist/Face Swap Studio.app
+dist/Face Swap Studio.zip
+dist/zip-parts
 
 # Neural-network weights and external repositories
 gfpgan/

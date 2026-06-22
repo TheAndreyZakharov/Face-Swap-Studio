@@ -425,6 +425,16 @@ class SessionStore:
         self._sessions: dict[str, StudioSession] = {}
         self._lock = threading.RLock()
 
+        self.clear_temporary_storage()
+
+    def clear_temporary_storage(
+        self,
+    ) -> None:
+        shutil.rmtree(
+            SESSION_ROOT,
+            ignore_errors=True,
+        )
+
         SESSION_ROOT.mkdir(
             parents=True,
             exist_ok=True,
@@ -501,26 +511,8 @@ class SessionStore:
         self,
     ) -> None:
         with self._lock:
-            sessions = list(
-                self._sessions.values()
-            )
             self._sessions.clear()
 
-        for session in sessions:
-            shutil.rmtree(
-                session.directory,
-                ignore_errors=True,
-            )
-
-        shutil.rmtree(
-            SESSION_ROOT,
-            ignore_errors=True,
-        )
-
-        SESSION_ROOT.mkdir(
-            parents=True,
-            exist_ok=True,
-        )
-
+        self.clear_temporary_storage()
 
 session_store = SessionStore()

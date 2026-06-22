@@ -215,6 +215,16 @@ function bindEvents() {
         },
     );
 
+    elements["download-button"].addEventListener(
+        "click",
+        event => {
+            event.preventDefault();
+            event.stopPropagation();
+
+            downloadCurrentResults();
+        },
+    );
+
     elements["result-previous-button"].addEventListener(
         "click",
         event => {
@@ -2424,6 +2434,139 @@ function updateSelectedModelDescription() {
     );
 }
 
+function safeDownloadFilename(
+    name,
+    fallback,
+) {
+    const rawName = (
+        name
+        || fallback
+    ).trim();
+
+    const safeName = rawName
+        .replace(
+            /[\/\\:]/g,
+            "_",
+        )
+        .replace(
+            /[^a-zA-Z0-9а-яА-ЯёЁ._ -]/g,
+            "_",
+        )
+        .trim();
+
+    return (
+        safeName
+        || fallback
+    );
+}
+
+
+function resultDownloadFilename(
+    result,
+) {
+    const baseName = safeDownloadFilename(
+        result.target_image_name
+            .replace(
+                /\.[^/.]+$/,
+                "",
+            ),
+        "face-swap-result",
+    );
+
+    return (
+        `${baseName}-face-swap.png`
+    );
+}
+
+
+async function downloadFileToDownloads(
+    url,
+    suggestedFilename,
+) {
+    if (!url) {
+        return;
+    }
+
+    if (
+        window.pywebview
+        && window.pywebview.api
+        && window.pywebview.api.download_file
+    ) {
+        try {
+            const result = await window.pywebview.api.download_file(
+                url,
+                suggestedFilename,
+            );
+
+            const filename = (
+                result
+                && result.filename
+                    ? result.filename
+                    : suggestedFilename
+            );
+
+            setStatus(
+                `Downloaded to Downloads: ${filename}`,
+            );
+
+            showToast(
+                `Downloaded: ${filename}`,
+            );
+        } catch (error) {
+            handleError(
+                error,
+            );
+        }
+
+        return;
+    }
+
+    const link = document.createElement(
+        "a",
+    );
+
+    link.href = url;
+    link.download = suggestedFilename;
+    link.rel = "noopener";
+
+    document.body.append(
+        link,
+    );
+
+    link.click();
+    link.remove();
+}
+
+
+function downloadCurrentResults() {
+    const generatedResults = currentGeneratedResults();
+
+    if (generatedResults.length === 0) {
+        showToast(
+            "No generated results to download.",
+            true,
+        );
+
+        return;
+    }
+
+    if (generatedResults.length > 1) {
+        downloadFileToDownloads(
+            `/api/sessions/${state.sessionId}/download`,
+            "face-swap-results.zip",
+        );
+
+        return;
+    }
+
+    downloadFileToDownloads(
+        generatedResults[0].download_url,
+        resultDownloadFilename(
+            generatedResults[0],
+        ),
+    );
+}
+
 async function deleteGeneratedResult(
     targetImageId,
 ) {
@@ -2688,8 +2831,26 @@ function renderResult() {
             );
 
             download.href = result.download_url;
-            download.download = "";
+            download.download = resultDownloadFilename(
+                result,
+            );
+
             download.textContent = "Download";
+
+            download.addEventListener(
+                "click",
+                event => {
+                    event.preventDefault();
+                    event.stopPropagation();
+
+                    downloadFileToDownloads(
+                        result.download_url,
+                        resultDownloadFilename(
+                            result,
+                        ),
+                    );
+                },
+            );
 
             footer.append(
                 name,
